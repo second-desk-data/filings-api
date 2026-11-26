@@ -170,13 +170,22 @@ def boot(db_path):
         os.environ,
         API_KEYS_JSON=json.dumps(KEYS),
         PORT=str(PORT), HOST="127.0.0.1",
+        # This battery covers the filings-only deployment shape: point
+        # the packs store at a nonexistent path so a production
+        # data/packs.db in the repo is never picked up here. The
+        # all-verticals delivery is covered by run_tests_v3.py.
+        VERMARCO_PACKS_DB=str(db_path.parent / "no-packs.db"),
         VERMARCO_CALLBACK_URL=CALLBACK_URL,
         VERMARCO_SIGNING_KEYS_JSON=json.dumps(
             {VM_KEY_ID: base64.urlsafe_b64encode(VM_PUB).rstrip(b"=").decode()}),
         # Unknown key ids must fail closed without network dependence.
         VERMARCO_SIGNING_KEY_URL="http://127.0.0.1:9/dead",
     )
-    log = open("/tmp/filings_api_v2_test_server.log", "w")
+    # Log beside the fixture DB, not /tmp: the box's /tmp tmpfs is
+    # small and was full during the Nov 26 deploys (server prints at
+    # startup would die on ENOSPC before ever answering /health).
+    log_path = db_path.parent / "v2-server.log"
+    log = open(log_path, "w")
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "app" / "server.py"), "--db", str(db_path)],
         env=env, stdout=log, stderr=subprocess.STDOUT)
@@ -189,7 +198,7 @@ def boot(db_path):
         except Exception:
             pass
         if time.time() > deadline:
-            print(open("/tmp/filings_api_v2_test_server.log").read()[-2000:])
+            print(log_path.read_text()[-2000:])
             proc.terminate()
             raise SystemExit("server did not come up")
         time.sleep(0.5)

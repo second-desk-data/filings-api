@@ -1,0 +1,642 @@
+{
+ "01087201-83f5-43b1-8b55-fb872370d503": {
+  "dataset": "census",
+  "key": "census:connecticut-full-state-demographics",
+  "route": "packs",
+  "scope": "connecticut-full-state-demographics",
+  "title": "Connecticut Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 14,790 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "01ea20de-dee7-436f-a3e9-63c72c82466e": {
+  "dataset": "census",
+  "key": "census:washington-full-state-demographics",
+  "route": "packs",
+  "scope": "washington-full-state-demographics",
+  "title": "Washington Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 37,845 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "06ce272f-2a59-4ab0-bae4-a1303317e5c7": {
+  "dataset": "census",
+  "key": "census:utah-full-state-demographics",
+  "route": "packs",
+  "scope": "utah-full-state-demographics",
+  "title": "Utah Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 17,835 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "086d7032-5cd6-4f0b-a1fb-5c03921a6777": {
+  "dataset": "census",
+  "key": "census:north-dakota-full-state-demographics",
+  "route": "packs",
+  "scope": "north-dakota-full-state-demographics",
+  "title": "North Dakota Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 9,570 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "09507cb9-7ea8-4adb-9656-84fea83d0b27": {
+  "dataset": "ucc",
+  "key": "ucc:ucc-ct-full-state-registry",
+  "route": "packs",
+  "scope": "CT",
+  "title": "Connecticut UCC Filings \u2014 Full State Registry (All Records As Filed) \u2014 851,637 rows \u00b7 1888-05-16 to 2026-11-24 \u00b7 CSV",
+  "vertical": "lending-credit"
+ },
+ "0a45357d-41da-443d-a842-33ab7ad8816e": {
+  "dataset": "census",
+  "key": "census:maryland-full-state-demographics",
+  "route": "packs",
+  "scope": "maryland-full-state-demographics",
+  "title": "Maryland Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 31,233 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "107fa56e-8bd6-4e51-a1ec-d308be1cdaa2": {
+  "dataset": "census",
+  "key": "census:oregon-full-state-demographics",
+  "route": "packs",
+  "scope": "oregon-full-state-demographics",
+  "title": "Oregon Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 22,968 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "10a43240-3692-4c18-9fba-bba493ec67b6": {
+  "dataset": "census",
+  "key": "census:massachusetts-full-state-demographics",
+  "route": "packs",
+  "scope": "massachusetts-full-state-demographics",
+  "title": "Massachusetts Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 20,880 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "1661e5c1-07ad-4767-9783-eeceef14072a": {
+  "dataset": "census",
+  "key": "census:new-mexico-full-state-demographics",
+  "route": "packs",
+  "scope": "new-mexico-full-state-demographics",
+  "title": "New Mexico Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 17,139 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "1cdcd278-1c1d-43cd-8750-e9cafe312b6d": {
+  "dataset": "census",
+  "key": "census:iowa-full-state-demographics",
+  "route": "packs",
+  "scope": "iowa-full-state-demographics",
+  "title": "Iowa Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 33,147 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "1edad938-cc6f-4aee-a123-5bb455b8dccb": {
+  "defaults": {
+   "state": "OR"
+  },
+  "key": "filings:OR:or-full-state",
+  "route": "filings",
+  "title": "Oregon Business Filings \u2014 The Complete Dataset (Full State Pack, As-Is) \u2014 203,815 rows \u00b7 2024-01-02 to 2026-11-23 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "1f6dd214-624b-4029-a8b7-28ae2ecf2ff1": {
+  "dataset": "census",
+  "key": "census:south-dakota-full-state-demographics",
+  "route": "packs",
+  "scope": "south-dakota-full-state-demographics",
+  "title": "South Dakota Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 12,354 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "24f9c7fb-fe21-480b-9fdd-3eee6aa1bb4d": {
+  "defaults": {},
+  "key": "filings:US:national-bundle-all-states",
+  "route": "filings",
+  "title": "US Business Filings \u2014 All 8 States Complete Dataset (National Bundle, As-Is) \u2014 5,724,302 rows \u00b7 1753-01-01 to 2027-02-15 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "2670ddc4-e36e-4c9b-be04-b1854edb8580": {
+  "dataset": "ucc",
+  "key": "ucc:ucc-national-bundle-all-states",
+  "route": "packs",
+  "scope": null,
+  "title": "UCC Filings \u2014 National Bundle (All States Held, All Records As Filed) \u2014 3,468,671 rows \u00b7 1888-05-16 to 2026-11-24 \u00b7 CSV",
+  "vertical": "lending-credit"
+ },
+ "296b28a4-ac13-47cb-b59a-6c9c51c2af30": {
+  "dataset": "census",
+  "key": "census:maine-full-state-demographics",
+  "route": "packs",
+  "scope": "maine-full-state-demographics",
+  "title": "Maine Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 10,527 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "2af31097-93e5-419d-b058-614fc0021db7": {
+  "dataset": "ucc",
+  "limit": 25,
+  "route": "packs",
+  "scope": "CO",
+  "test_pack": true,
+  "vertical": "lending-credit"
+ },
+ "2c2f020f-9f36-41c3-81b9-92700c2f62dc": {
+  "defaults": {
+   "state": "NY"
+  },
+  "key": "filings:NY:ny-full-state",
+  "route": "filings",
+  "title": "New York Business Filings \u2014 The Complete Dataset (Full State Pack, As-Is) \u2014 750,671 rows \u00b7 2024-01-01 to 2026-11-24 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "2f601af6-f743-4497-b7be-1a10e0fb7af8": {
+  "dataset": "census",
+  "key": "census:oklahoma-full-state-demographics",
+  "route": "packs",
+  "scope": "oklahoma-full-state-demographics",
+  "title": "Oklahoma Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 27,405 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "31f8cac0-8179-4150-9469-bce81dcd0d14": {
+  "defaults": {
+   "state": "IA"
+  },
+  "key": "filings:IA:ia-full-state",
+  "route": "filings",
+  "title": "Iowa Business Filings \u2014 The Complete Dataset (Full State Pack, As-Is) \u2014 351,617 rows \u00b7 1828-06-07 to 2027-01-01 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "331a8dc2-335f-4a62-a8c1-5ad83f4289f9": {
+  "dataset": "warn",
+  "key": "warn-act:us-warn-act-full-national-complete",
+  "route": "packs",
+  "scope": "us-warn-act-full-national-complete",
+  "title": "US WARN Act Notices \u2014 National Bundle, All States, Complete \u2014 All Records Held \u2014 32366 rows \u00b7 1998-07-14 to 2026-11-20 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "33d89b8b-82fd-4dea-89d7-29fca0f72995": {
+  "dataset": "census",
+  "key": "census:colorado-full-state-demographics",
+  "route": "packs",
+  "scope": "colorado-full-state-demographics",
+  "title": "Colorado Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 24,795 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "35069e92-96e5-44cd-a172-249978dcfda4": {
+  "dataset": "warn",
+  "key": "warn-act:tx-full-state",
+  "route": "packs",
+  "scope": "tx-full-state",
+  "title": "Texas WARN Act Notices \u2014 Full State, All Records Held \u2014 2359 rows \u00b7 2019-01-04 to 2026-06-23 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "37cf116e-f3ed-4b5c-8471-5d5d843640eb": {
+  "defaults": {
+   "limit": 25,
+   "state": "PA"
+  },
+  "route": "filings",
+  "test_pack": true,
+  "vertical": "forms-filings"
+ },
+ "387db031-c246-44dd-8be0-84ee7207452d": {
+  "dataset": "warn",
+  "key": "warn-act:nc-full-state-complete",
+  "route": "packs",
+  "scope": "nc-full-state-complete",
+  "title": "North Carolina WARN Act Notices \u2014 Full State, Complete (Archive + Current, All Records Held) \u2014 1079 rows \u00b7 2014-01-13 to 2026-11-04 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "39e756c5-b6d8-45e6-9ec6-28bfe5df95e9": {
+  "dataset": "census",
+  "limit": 25,
+  "route": "packs",
+  "scope": "us-census-demographics-national-bundle",
+  "test_pack": true,
+  "vertical": "demographics"
+ },
+ "3e5d3064-af37-4ac8-baff-26fc37cf0718": {
+  "dataset": "census",
+  "key": "census:west-virginia-full-state-demographics",
+  "route": "packs",
+  "scope": "west-virginia-full-state-demographics",
+  "title": "West Virginia Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 17,922 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "43640ba0-fe68-48cd-b2fb-fe2d2d8451c5": {
+  "dataset": "census",
+  "key": "census:arizona-full-state-demographics",
+  "route": "packs",
+  "scope": "arizona-full-state-demographics",
+  "title": "Arizona Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 19,401 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "43b01c1a-12a2-4405-b58b-0afcae662190": {
+  "dataset": "census",
+  "key": "census:nebraska-full-state-demographics",
+  "route": "packs",
+  "scope": "nebraska-full-state-demographics",
+  "title": "Nebraska Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 18,531 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "43fabaff-f8cd-41f3-99bc-a6ec2428f553": {
+  "dataset": "census",
+  "key": "census:idaho-full-state-demographics",
+  "route": "packs",
+  "scope": "idaho-full-state-demographics",
+  "title": "Idaho Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 12,702 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "4875fba6-1f9c-40e4-a308-5c917247ca5d": {
+  "dataset": "census",
+  "key": "census:ohio-full-state-demographics",
+  "route": "packs",
+  "scope": "ohio-full-state-demographics",
+  "title": "Ohio Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 67,251 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "49f39950-ae9a-4dcf-a51e-bd51babdf0dd": {
+  "dataset": "census",
+  "key": "census:mississippi-full-state-demographics",
+  "route": "packs",
+  "scope": "mississippi-full-state-demographics",
+  "title": "Mississippi Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 24,099 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "4caf16be-8fa7-4679-9cd7-8b9e178b7281": {
+  "dataset": "warn",
+  "key": "warn-act:fl-full-state-complete",
+  "route": "packs",
+  "scope": "fl-full-state-complete",
+  "title": "Florida WARN Act Notices \u2014 Full State, Complete (Archive + Current, All Records Held) \u2014 2652 rows \u00b7 2019-01-02 to 2026-11-20 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "4e42d20f-6409-40c6-a3bc-af8a001fd62f": {
+  "defaults": {
+   "state": "CO"
+  },
+  "key": "filings:CO:co-full-state",
+  "route": "filings",
+  "title": "Colorado Business Filings \u2014 The Complete Dataset (Full State Pack, As-Is) \u2014 536,338 rows \u00b7 2024-01-01 to 2026-11-21 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "5201c2e8-a57c-46b4-b2b0-f550f8347d81": {
+  "dataset": "census",
+  "key": "census:georgia-full-state-demographics",
+  "route": "packs",
+  "scope": "georgia-full-state-demographics",
+  "title": "Georgia Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 47,502 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "5864a6d1-95ca-423d-984c-dcaa4c3689b0": {
+  "dataset": "census",
+  "key": "census:us-census-demographics-national-bundle",
+  "route": "packs",
+  "scope": "us-census-demographics-national-bundle",
+  "title": "US Census Demographics \u2014 National Bundle (All States, Counties & Cities, ACS 2024 5-Year) \u2014 1,665,267 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "5aa7e382-a8c7-4fa6-b271-55e3ccaf62b0": {
+  "dataset": "census",
+  "key": "census:california-full-state-demographics",
+  "route": "packs",
+  "scope": "california-full-state-demographics",
+  "title": "California Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 97,527 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "5bcb1558-9b55-47c7-937e-6987e6ef0bb3": {
+  "defaults": {
+   "limit": 25,
+   "state": "LA"
+  },
+  "route": "filings",
+  "test_pack": true,
+  "vertical": "forms-filings"
+ },
+ "62152235-fac2-4ab8-945a-c2c7a6fb6334": {
+  "dataset": "census",
+  "key": "census:florida-full-state-demographics",
+  "route": "packs",
+  "scope": "florida-full-state-demographics",
+  "title": "Florida Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 73,776 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "63dcf36d-9933-4937-ae44-6ca26c51f111": {
+  "dataset": "census",
+  "key": "census:alaska-full-state-demographics",
+  "route": "packs",
+  "scope": "alaska-full-state-demographics",
+  "title": "Alaska Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 8,874 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "66d054a2-94bb-4fff-a836-94fe68ff9a4f": {
+  "dataset": "census",
+  "key": "census:hawaii-full-state-demographics",
+  "route": "packs",
+  "scope": "hawaii-full-state-demographics",
+  "title": "Hawaii Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 11,397 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "66e9c950-7119-495f-879f-8e58c531a978": {
+  "dataset": "warn",
+  "key": "warn-act:ca-full-state-complete",
+  "route": "packs",
+  "scope": "ca-full-state-complete",
+  "title": "California WARN Act Notices \u2014 Full State, Complete (Archive + Current, All Records Held) \u2014 17609 rows \u00b7 2008-09-04 to 2026-11-18 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "70b82a5a-84fc-40e3-97d7-7ebb3f977668": {
+  "dataset": "census",
+  "key": "census:new-hampshire-full-state-demographics",
+  "route": "packs",
+  "scope": "new-hampshire-full-state-demographics",
+  "title": "New Hampshire Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 6,699 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "7607e4e6-9607-4fec-a375-fecb0e2e72e6": {
+  "dataset": "census",
+  "key": "census:puerto-rico-full-state-demographics",
+  "route": "packs",
+  "scope": "puerto-rico-full-state-demographics",
+  "title": "Puerto Rico Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 24,621 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "7e884885-4701-47cc-be9e-1df6cfb8e5fc": {
+  "dataset": "census",
+  "key": "census:rhode-island-full-state-demographics",
+  "route": "packs",
+  "scope": "rhode-island-full-state-demographics",
+  "title": "Rhode Island Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 2,871 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "8230d9b7-f79b-4359-8e2f-440affc111be": {
+  "dataset": "census",
+  "key": "census:missouri-full-state-demographics",
+  "route": "packs",
+  "scope": "missouri-full-state-demographics",
+  "title": "Missouri Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 42,717 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "83aff610-d6df-48d2-a48b-bc1e5ca74c83": {
+  "defaults": {
+   "state": "LA"
+  },
+  "key": "filings:LA:la-full-state",
+  "route": "filings",
+  "title": "Louisiana Business Filings \u2014 The Complete Dataset (Full State Pack, As-Is) \u2014 126,710 rows \u00b7 2024-11-24 to 2026-11-21 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "8e1612a0-ec36-449d-b75d-bcd02e94eb49": {
+  "dataset": "census",
+  "key": "census:new-jersey-full-state-demographics",
+  "route": "packs",
+  "scope": "new-jersey-full-state-demographics",
+  "title": "New Jersey Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 49,938 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "8ed1bc09-f37b-4603-a48d-82a2cd3e0555": {
+  "dataset": "census",
+  "key": "census:delaware-full-state-demographics",
+  "route": "packs",
+  "scope": "delaware-full-state-demographics",
+  "title": "Delaware Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 5,133 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "900bfef0-75c1-4f0b-8bc2-5cb3ecb9533a": {
+  "dataset": "warn",
+  "key": "warn-act:al-full-state",
+  "route": "packs",
+  "scope": "al-full-state",
+  "title": "Alabama WARN Act Notices \u2014 Full State, All Records Held \u2014 1,069 rows \u00b7 1998-07-14 to 2026-11-06 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "909d865c-2388-4f1c-a7bc-76017d2b1505": {
+  "dataset": "census",
+  "key": "census:wyoming-full-state-demographics",
+  "route": "packs",
+  "scope": "wyoming-full-state-demographics",
+  "title": "Wyoming Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 6,960 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "92b14c5e-1bb3-48ea-ba6c-dd9174b25c1c": {
+  "dataset": "warn",
+  "limit": 25,
+  "route": "packs",
+  "scope": "us-warn-act-full-national-complete",
+  "test_pack": true,
+  "vertical": "labor-market"
+ },
+ "9824ae6c-886c-4a78-bbac-ccc40f73a46a": {
+  "dataset": "census",
+  "key": "census:north-carolina-full-state-demographics",
+  "route": "packs",
+  "scope": "north-carolina-full-state-demographics",
+  "title": "North Carolina Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 48,633 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "9a28552b-5d57-4658-a69b-6edafc7c49a6": {
+  "dataset": "census",
+  "key": "census:minnesota-full-state-demographics",
+  "route": "packs",
+  "scope": "minnesota-full-state-demographics",
+  "title": "Minnesota Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 39,324 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "9cc2f05d-1d94-4240-9350-8c90d992171a": {
+  "dataset": "census",
+  "key": "census:arkansas-full-state-demographics",
+  "route": "packs",
+  "scope": "arkansas-full-state-demographics",
+  "title": "Arkansas Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 25,578 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "9e3b444a-8e38-490d-9b37-739cc09bade9": {
+  "dataset": "census",
+  "key": "census:alabama-full-state-demographics",
+  "route": "packs",
+  "scope": "alabama-full-state-demographics",
+  "title": "Alabama Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 33,756 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "a44cb767-b60c-4f0c-ae10-c71a70cc5307": {
+  "dataset": "census",
+  "key": "census:texas-full-state-demographics",
+  "route": "packs",
+  "scope": "texas-full-state-demographics",
+  "title": "Texas Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 110,664 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "a4519005-f21c-4b15-a80e-4d48440f1cd7": {
+  "defaults": {
+   "state": "CT"
+  },
+  "key": "filings:CT:ct-full-state",
+  "route": "filings",
+  "title": "Connecticut Business Filings \u2014 The Complete Dataset (Full State Pack, As-Is) \u2014 1,310,099 rows \u00b7 1900-01-02 to 2026-11-24 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "a51b3385-5f06-414e-aada-f67db035b433": {
+  "dataset": "ucc",
+  "key": "ucc:ucc-co-full-state-registry",
+  "route": "packs",
+  "scope": "CO",
+  "title": "Colorado UCC Filings \u2014 Full State Registry (All Records As Filed) \u2014 2,617,034 rows \u00b7 1966-07-01 to 2026-11-21 \u00b7 CSV",
+  "vertical": "lending-credit"
+ },
+ "ac5ccf11-e5b9-45ea-8e5d-ea39f7cd02ae": {
+  "dataset": "census",
+  "key": "census:illinois-full-state-demographics",
+  "route": "packs",
+  "scope": "illinois-full-state-demographics",
+  "title": "Illinois Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 69,600 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "ad5014de-3786-43a3-8661-dacffe261e60": {
+  "dataset": "warn",
+  "key": "warn-act:in-full-state",
+  "route": "packs",
+  "scope": "in-full-state",
+  "title": "Indiana WARN Act Notices \u2014 Full State, All Records Held \u2014 1,187 rows \u00b7 2008-07-10 to 2026-11-12 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "ad8eb120-2225-4607-b12f-bef1a34011e7": {
+  "dataset": "census",
+  "key": "census:montana-full-state-demographics",
+  "route": "packs",
+  "scope": "montana-full-state-demographics",
+  "title": "Montana Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 13,137 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "adbaab23-e65a-4d60-9872-09f68b28ec48": {
+  "dataset": "trademark",
+  "limit": 25,
+  "route": "packs",
+  "scope": null,
+  "test_pack": true,
+  "vertical": "patents-trademarks"
+ },
+ "b4c3c62b-ba91-44cc-9a1a-78ff1ce3fe6f": {
+  "dataset": "trademark",
+  "key": "trademark:trademark-filings-us-national-bundle-2026-ytd",
+  "route": "packs",
+  "scope": null,
+  "title": "ALL New U.S. Trademark Applications \u2014 National Bundle (Jan 1-Aug 31, 2026 (2026 year-to-date)) \u2014 459,770 rows \u00b7 2026-01-01 to 2026-08-31 \u00b7 CSV",
+  "vertical": "patents-trademarks"
+ },
+ "bb89ea8c-8416-4150-9c46-c70cde9350a8": {
+  "dataset": "census",
+  "key": "census:michigan-full-state-demographics",
+  "route": "packs",
+  "scope": "michigan-full-state-demographics",
+  "title": "Michigan Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 45,936 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "c73da895-5d40-4950-bbfa-6c78617b8fe0": {
+  "dataset": "census",
+  "key": "census:vermont-full-state-demographics",
+  "route": "packs",
+  "scope": "vermont-full-state-demographics",
+  "title": "Vermont Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 5,742 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "d57eec26-dcf6-4fdb-abb5-8fd45acb7384": {
+  "defaults": {
+   "state": "FL"
+  },
+  "key": "filings:FL:fl-full-state",
+  "route": "filings",
+  "title": "Florida Business Filings \u2014 The Complete Dataset (Full State Pack, As-Is) \u2014 58,923 rows \u00b7 1967-02-22 to 2027-02-15 \u00b7 CSV",
+  "vertical": "forms-filings"
+ },
+ "d5a2ea6f-2934-4854-a42e-88fc8b1bf90b": {
+  "dataset": "warn",
+  "key": "warn-act:va-full-state",
+  "route": "packs",
+  "scope": "va-full-state",
+  "title": "Virginia WARN Act Notices \u2014 Full State, All Records Held \u2014 1,140 rows \u00b7 2010-07-29 to 2026-11-13 \u00b7 CSV",
+  "vertical": "labor-market"
+ },
+ "d98175cd-c2c8-4e45-a7a3-0e6343cdd43b": {
+  "dataset": "census",
+  "key": "census:south-carolina-full-state-demographics",
+  "route": "packs",
+  "scope": "south-carolina-full-state-demographics",
+  "title": "South Carolina Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 27,405 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "da1d0c00-1fea-4244-b341-f9f7141e701c": {
+  "dataset": "census",
+  "key": "census:nevada-full-state-demographics",
+  "route": "packs",
+  "scope": "nevada-full-state-demographics",
+  "title": "Nevada Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 7,395 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "dc1961af-30b9-4a54-a1e6-84c3b0a1e65d": {
+  "dataset": "census",
+  "key": "census:indiana-full-state-demographics",
+  "route": "packs",
+  "scope": "indiana-full-state-demographics",
+  "title": "Indiana Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 38,802 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "dc4a5a67-5900-4d0d-8502-529e307ce288": {
+  "dataset": "census",
+  "key": "census:new-york-full-state-demographics",
+  "route": "packs",
+  "scope": "new-york-full-state-demographics",
+  "title": "New York Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 80,040 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "dc9b2f9a-77b6-4e4a-be70-efe7ef4b41c5": {
+  "dataset": "census",
+  "key": "census:pennsylvania-full-state-demographics",
+  "route": "packs",
+  "scope": "pennsylvania-full-state-demographics",
+  "title": "Pennsylvania Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 92,655 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "e1fea674-2552-4038-a424-90ba34b4d249": {
+  "dataset": "census",
+  "key": "census:kansas-full-state-demographics",
+  "route": "packs",
+  "scope": "kansas-full-state-demographics",
+  "title": "Kansas Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 26,796 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "e706c774-81fa-4d0e-8b27-fe238232a66b": {
+  "dataset": "census",
+  "key": "census:wisconsin-full-state-demographics",
+  "route": "packs",
+  "scope": "wisconsin-full-state-demographics",
+  "title": "Wisconsin Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 40,803 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "e8bd7415-4768-4f07-a521-2c75237a48a1": {
+  "dataset": "census",
+  "key": "census:virginia-full-state-demographics",
+  "route": "packs",
+  "scope": "virginia-full-state-demographics",
+  "title": "Virginia Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 44,631 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "ea71ae17-82d0-43a9-a346-8e239491ee92": {
+  "dataset": "census",
+  "key": "census:louisiana-full-state-demographics",
+  "route": "packs",
+  "scope": "louisiana-full-state-demographics",
+  "title": "Louisiana Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 29,145 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "ef001b89-1cb8-4a3d-aa83-8e968649f4af": {
+  "defaults": {
+   "state": "PA"
+  },
+  "key": "filings:PA:pa-full-state",
+  "route": "filings",
+  "vertical": "forms-filings"
+ },
+ "f1b59542-fcd6-4d6a-99e1-8bcc4be3e86e": {
+  "dataset": "census",
+  "key": "census:kentucky-full-state-demographics",
+  "route": "packs",
+  "scope": "kentucky-full-state-demographics",
+  "title": "Kentucky Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 31,668 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ },
+ "f2a7e66e-431d-488d-8218-28ab4fe47cc5": {
+  "dataset": "census",
+  "key": "census:tennessee-full-state-demographics",
+  "route": "packs",
+  "scope": "tennessee-full-state-demographics",
+  "title": "Tennessee Census Demographics \u2014 Full State Pack (State, Counties & Cities, ACS 2024 5-Year) \u2014 34,887 rows \u00b7 Full dataset \u00b7 CSV",
+  "vertical": "demographics"
+ }
+}

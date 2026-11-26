@@ -438,6 +438,10 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "ok",
                 "callback_url": VERMARCO.CALLBACK_URL,
                 "served_vertical": VERMARCO.SERVED_VERTICAL,
+                "served_verticals": list(VERMARCO.SERVED_VERTICALS),
+                "packs_store": ("present" if VERMARCO.packs_store_present()
+                                else "absent"),
+                "listings_registered": len(VERMARCO.LISTING_REGISTRY),
             })
 
         if path == "/v1/regions":

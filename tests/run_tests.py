@@ -104,6 +104,11 @@ def build_store(data_dir):
 
 
 def boot(port, db_path, log_path):
+    # The box's /tmp tmpfs is small and was full during the Nov 26
+    # deploys; a server whose startup prints cannot be written dies
+    # silently before answering /health. Route logs through the
+    # TMPDIR-honoring temp dir (identical to /tmp when TMPDIR unset).
+    log_path = str(Path(tempfile.gettempdir()) / Path(log_path).name)
     env = dict(os.environ, API_KEYS_JSON=json.dumps(KEYS),
                PORT=str(port), HOST="127.0.0.1")
     log = open(log_path, "w")
