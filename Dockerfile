@@ -1,39 +1,53 @@
 # New Business Filings API — dependency-free (Python stdlib only).
-# Build:  docker build -t filings-api .
-# Run:    docker run -p 8791:8791 -e API_KEYS_JSON='{"keys":[...]}' filings-api
 #
-# BEFORE building, build the SQLite stores (the image ships the
-# compressed deploy DB, NOT the ~2 GB of source JSON — the server is
-# disk-backed and reads only the database):
-#     python3 build_db.py                              # canonical store
-#     python3 build_db.py --compress --out data/filings.deploy.db
-# The canonical data/filings.db stays plain-JSON (the test suite reads
-# it directly); the deploy build stores record_json zlib-compressed and
-# app/server.py decompresses on read — responses are byte-identical,
-# the file is ~2.2 GB smaller. Rebuild both after every data refresh
-# (refresh.py / new state files) and rebuild the image; the store is a
-# snapshot, exactly like the JSON was.
+# Split-layer variant: the compressed deploy DB (6.63 GB) ships as
+# 256 MB parts, ONE COPY PER PART, so every registry layer is a
+# separate ~256 MB blob (a single monolithic blob push gets dropped
+# by this network's proxy ~10 minutes into the PATCH).
+# assemble-and-run.sh concatenates the parts into data/filings.db at
+# container start; content is byte-identical to the monolithic build
+# (sha256-verified against data/filings.deploy.db).
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# App code + SQLite store + demo key store (real keys come from
-# API_KEYS_JSON). packs/classify.py is the canonical industry/need
-# classifier shared with the category packs — the API loads it by path
-# for labels/slug validation, so it ships in the image.
 COPY app/ ./app/
-COPY data/filings.deploy.db ./data/filings.db
+COPY data/db-parts/part-000 ./data/db-parts/part-000
+COPY data/db-parts/part-001 ./data/db-parts/part-001
+COPY data/db-parts/part-002 ./data/db-parts/part-002
+COPY data/db-parts/part-003 ./data/db-parts/part-003
+COPY data/db-parts/part-004 ./data/db-parts/part-004
+COPY data/db-parts/part-005 ./data/db-parts/part-005
+COPY data/db-parts/part-006 ./data/db-parts/part-006
+COPY data/db-parts/part-007 ./data/db-parts/part-007
+COPY data/db-parts/part-008 ./data/db-parts/part-008
+COPY data/db-parts/part-009 ./data/db-parts/part-009
+COPY data/db-parts/part-010 ./data/db-parts/part-010
+COPY data/db-parts/part-011 ./data/db-parts/part-011
+COPY data/db-parts/part-012 ./data/db-parts/part-012
+COPY data/db-parts/part-013 ./data/db-parts/part-013
+COPY data/db-parts/part-014 ./data/db-parts/part-014
+COPY data/db-parts/part-015 ./data/db-parts/part-015
+COPY data/db-parts/part-016 ./data/db-parts/part-016
+COPY data/db-parts/part-017 ./data/db-parts/part-017
+COPY data/db-parts/part-018 ./data/db-parts/part-018
+COPY data/db-parts/part-019 ./data/db-parts/part-019
+COPY data/db-parts/part-020 ./data/db-parts/part-020
+COPY data/db-parts/part-021 ./data/db-parts/part-021
+COPY data/db-parts/part-022 ./data/db-parts/part-022
+COPY data/db-parts/part-023 ./data/db-parts/part-023
+COPY data/db-parts/part-024 ./data/db-parts/part-024
 COPY packs/classify.py ./packs/
 COPY api_keys.json ./api_keys.json
+COPY assemble-and-run.sh ./assemble-and-run.sh
 
-# HOST/PORT are read by app/server.py. The host platform may override PORT.
 ENV HOST=0.0.0.0 \
     PORT=8791 \
     PYTHONUNBUFFERED=1
 
 EXPOSE 8791
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
     CMD python3 -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8791') + '/health', timeout=4)"
 
-CMD ["python3", "app/server.py"]
+ENTRYPOINT ["sh", "assemble-and-run.sh"]

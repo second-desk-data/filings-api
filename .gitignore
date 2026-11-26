@@ -9,3 +9,6 @@ api_keys.live.json
 .build-logs/
 __pycache__/
 *.pyc
+
+# Deploy DB parts are build artifacts (split from filings.deploy.db); never commit.
+data/db-parts/
