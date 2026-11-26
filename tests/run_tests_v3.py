@@ -351,6 +351,15 @@ def main():
         check("census: pack delivery under the 10 MB cap",
               len(json.dumps(body).encode()) < 10_000_000)
 
+        s, body = deliver(CENSUS_AL, "demographics",
+                          {"city": "Birmingham"})
+        data = body.get("data") or {}
+        recs = data.get("records") or []
+        check("census: city filter matches the geography label",
+              s == 200 and data.get("count") == 1
+              and recs[0].get("geography_name") == "Birmingham city",
+              f"{s} {str(body)[:200]}")
+
         s, body = deliver(CENSUS_TEST, "demographics")
         data = body.get("data") or {}
         check("census: $0 test pack serves the national bundle sample",

@@ -663,7 +663,13 @@ def run_pack_delivery(pack_store, dataset, scope, query, listing_id,
         args += state_variants
     city = _s("city").lower()
     if city:
-        clauses.append("city_key = ?")
+        if dataset == "census":
+            # Census city_key is the full geography label
+            # ("Birmingham city, Alabama", "Autauga County,
+            # Alabama"), so a city filter matches as a substring.
+            clauses.append("instr(city_key, ?) > 0")
+        else:
+            clauses.append("city_key = ?")
         args.append(city)
     q = (_s("q") or _s("name")).lower()
     if q:

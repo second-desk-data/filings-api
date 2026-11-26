@@ -102,9 +102,14 @@ def warn_sources():
                  "nc-full-state-complete"):
         out.append(("warn", slug, p2 / slug / (slug + ".csv")))
     old = PRODUCTS / "81-warn-act" / "packs"
-    for slug in ("al-full-state", "in-full-state", "va-full-state",
-                 "tx-full-state"):
+    for slug in ("al-full-state", "in-full-state", "va-full-state"):
         out.append(("warn", slug, old / slug / (slug + ".csv")))
+    # The 81 tree no longer carries a Texas pack; the refreshed TX
+    # edition lives in the 91-layoffs-global tree (2,359 notices —
+    # the listing advertises the older 4,741-row edition; the count
+    # discrepancy is flagged in the v3 build notes).
+    out.append(("warn", "tx-full-state",
+                p2 / "tx-full-state" / "tx-full-state.csv"))
     return out
 
 
@@ -212,7 +217,7 @@ def main():
     args = ap.parse_args()
     print(f"building {args.out} from {len(all_sources())} pack files...")
     stats = build(all_sources(), args.out)
-    stats_path = Path(args.out).with_suffix(".db.stats.json") \
+    stats_path = Path(str(args.out) + ".stats.json") \
         if str(args.out).endswith(".db") else Path(str(args.out) + ".stats.json")
     stats_path.write_text(json.dumps(stats, indent=1), encoding="utf-8")
     print(f"done: {stats['total_records']} records, "

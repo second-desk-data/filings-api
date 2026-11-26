@@ -38,6 +38,17 @@ COPY data/db-parts/part-021 ./data/db-parts/part-021
 COPY data/db-parts/part-022 ./data/db-parts/part-022
 COPY data/db-parts/part-023 ./data/db-parts/part-023
 COPY data/db-parts/part-024 ./data/db-parts/part-024
+COPY data/pack-parts/part-000 ./data/pack-parts/part-000
+COPY data/pack-parts/part-001 ./data/pack-parts/part-001
+COPY data/pack-parts/part-002 ./data/pack-parts/part-002
+COPY data/pack-parts/part-003 ./data/pack-parts/part-003
+COPY data/pack-parts/part-004 ./data/pack-parts/part-004
+COPY data/pack-parts/part-005 ./data/pack-parts/part-005
+COPY data/pack-parts/part-006 ./data/pack-parts/part-006
+COPY data/pack-parts/part-007 ./data/pack-parts/part-007
+COPY data/pack-parts/part-008 ./data/pack-parts/part-008
+COPY data/pack-parts/part-009 ./data/pack-parts/part-009
+COPY data/pack-parts/part-010 ./data/pack-parts/part-010
 COPY packs/classify.py ./packs/
 COPY api_keys.json ./api_keys.json
 COPY assemble-and-run.sh ./assemble-and-run.sh
