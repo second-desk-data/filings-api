@@ -12,6 +12,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY app/ ./app/
+COPY openapi.yaml ./openapi.yaml
 COPY data/db-parts/part-000 ./data/db-parts/part-000
 COPY data/db-parts/part-001 ./data/db-parts/part-001
 COPY data/db-parts/part-002 ./data/db-parts/part-002

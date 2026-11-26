@@ -190,6 +190,31 @@ This powers the pack catalog and buyer browsing.
 (Counts shown are the real Louisiana numbers as of the last test run;
 call the endpoint for live ones.)
 
+### `GET /openapi.yaml` — OpenAPI spec (public)
+The full OpenAPI 3 description of this API, served by the API itself
+from the repo's `openapi.yaml`. Also the source for marketplace
+listings (APIs.guru, Postman, API.market).
+
+### MCP server — `app/mcp_server.py`
+The same data as MCP tools for agent clients: `search_businesses`,
+`get_business`, `list_regions`, `list_categories` — backed by the
+same SQLite store and enforcing the same API-key scope and daily
+quota (key via the `FILINGS_API_KEY` env var on stdio, or the
+`X-API-Key` header on streamable-http). Requires the official Python
+MCP SDK: `pip install -r requirements-mcp.txt`, then
+`python3 app/mcp_server.py` (stdio) or
+`python3 app/mcp_server.py --transport streamable-http --port 8792`.
+
+### Vermarco delivery webhook — `POST /webhooks/vermarco`
+The sellmydata.ai / Vertical Marketplace delivery callback
+(see `85-sellmydata-bulk/RUNBOOK.md`, Gate 2, in the workspace).
+Authenticated by the platform's Ed25519 signature (not an API key):
+signed `verification_challenge` posts get the nonce back, signed
+`delivery_request` posts get a per-query filings slice as
+`{"data": {...}}` under the platform's 10 MB cap, with a JCS
+(RFC 8785) `__sha256` integrity attestation. The CT enrichment email
+is never delivered on that channel.
+
 ## Auth, quotas, scope, errors
 
 Every `/v1/*` response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
@@ -274,8 +299,13 @@ published archive if the dataset ever needs to be reconstructed.
 ## Layout
 
 ```
-app/server.py        the API (stdlib only)
+app/server.py        the REST API (stdlib only)
+app/mcp_server.py    the MCP server (same store, same keys; needs the
+                     MCP SDK — see requirements-mcp.txt)
+app/ed25519.py       pure-Python Ed25519 (RFC 8032) for webhook signatures
+app/vermarco.py      Vermarco delivery-callback protocol (Gate 2)
 app/classify.py      slug-interface adapter over the canonical classifier
+openapi.yaml         OpenAPI 3 spec, served at /openapi.yaml
 packs/classify.py    THE canonical industry/need classifier (shared with
                      the $9 packs; documented in packs/CATEGORIES.md)
 packs/               category pack folders + PACK-CATALOG.md

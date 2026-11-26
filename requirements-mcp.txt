@@ -1,0 +1,6 @@
+# Only needed for app/mcp_server.py (the MCP server surface).
+# The REST API (app/server.py) is Python-stdlib-only and does NOT
+# use anything here. Pinned below 2.0: in mcp 2.x FastMCP was renamed
+# (mcp.server.mcpserver.MCPServer); this codebase targets the v1
+# FastMCP API (mcp.server.fastmcp).
+mcp>=1.2,<2

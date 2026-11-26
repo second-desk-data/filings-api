@@ -1,0 +1,840 @@
+openapi: 3.0.3
+info:
+  title: New Business Filings API
+  version: 0.4.0
+  description: |
+    Every new business filed with the state, as a clean JSON API —
+    searchable by state, region (parish/county), city, name, entity
+    type, industry category, likely-need segment, and filing age.
+
+    Secretaries of State publish new business filings as raw,
+    unstructured bulk files and weekly text dumps. This API ingests
+    each covered state's published filings, cleans them, and tags
+    every record with its region (Louisiana parish, county elsewhere),
+    an industry category inferred from the business name, likely-need
+    segments (needs a website, needs bookkeeping, likely hiring CDL
+    drivers, and more), and `agent_is_commercial` — a flag for filings
+    whose registered agent is a commercial formation mill.
+    Connecticut records additionally carry the filer's own published
+    business email (`email_as_filed`) and the NAICS code the filer
+    reported (`naics_code` / `naics_title`).
+
+    Coverage: 5,724,302 filings across 8 states — Pennsylvania
+    2,386,129 · Connecticut 1,310,099 · New York 750,671 · Colorado
+    536,338 · Iowa 351,617 · Oregon 203,815 · Louisiana 126,710 ·
+    Florida 58,923.
+
+    Auth: API key in the `X-API-Key` header, with per-tier daily
+    quotas and per-key scope (all data / one state / one city). Scope
+    is enforced on every endpoint: out-of-scope records are excluded
+    from results and counts, and single-record lookups outside the
+    scope answer 404.
+
+    Data honesty: industry is inferred from the business name (state
+    filings carry no industry code) and need segments are likely-need
+    marketing segments inferred from business type — both documented
+    as such, never presented as verified needs.
+  contact:
+    name: Second Desk
+    url: https://deskside.gumroad.com
+    email: seconddesks@proton.me
+servers:
+  - url: https://filings-api.onrender.com
+    description: Production
+tags:
+  - name: filings
+    description: Search and look up business filings
+  - name: coverage
+    description: Coverage and classification counts
+  - name: system
+    description: Health and service metadata
+  - name: webhooks
+    description: Marketplace delivery callbacks (signature-authenticated)
+security:
+  - ApiKeyAuth: []
+paths:
+  /:
+    get:
+      tags: [system]
+      summary: Service index
+      description: Public. Lists the API's endpoints and version.
+      security: []
+      operationId: getIndex
+      responses:
+        '200':
+          description: Service name, version, description, and the endpoint map.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  version:
+                    type: string
+                  description:
+                    type: string
+                  docs:
+                    type: string
+                  openapi:
+                    type: string
+                  endpoints:
+                    type: object
+                    additionalProperties:
+                      type: string
+  /health:
+    get:
+      tags: [system]
+      summary: Health + dataset stats
+      description: Public. Dataset status, totals, per-state counts, and freshness.
+      security: []
+      operationId: getHealth
+      responses:
+        '200':
+          description: Dataset health.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /openapi.yaml:
+    get:
+      tags: [system]
+      summary: This OpenAPI spec
+      description: Public. The OpenAPI 3 description of this API, served by the API itself.
+      security: []
+      operationId: getOpenApiSpec
+      responses:
+        '200':
+          description: The OpenAPI document (YAML).
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/businesses:
+    get:
+      tags: [filings]
+      summary: Search filings
+      description: |
+        Search business filings. All parameters are optional and all
+        filters compose. Results are ordered by filing date, newest
+        first. The response carries a `scope` object describing the
+        key's bound scope, and a `scope_note` when the request
+        explicitly asked outside that scope.
+      operationId: searchBusinesses
+      parameters:
+        - name: q
+          in: query
+          description: Substring match on business name (case-insensitive).
+          schema:
+            type: string
+          example: transport
+        - name: state
+          in: query
+          description: Filing state (the state whose filings these are — the record's `filing_state`).
+          schema:
+            type: string
+            enum: [CO, CT, FL, IA, LA, NY, OR, PA]
+          example: LA
+        - name: parish
+          in: query
+          description: Louisiana parish (exact, case-insensitive).
+          schema:
+            type: string
+          example: Evangeline
+        - name: county
+          in: query
+          description: County for non-LA states (exact, case-insensitive).
+          schema:
+            type: string
+          example: Travis
+        - name: region
+          in: query
+          description: Parish or county, whichever the record's state uses.
+          schema:
+            type: string
+          example: Evangeline
+        - name: city
+          in: query
+          description: Mailing city (exact, case-insensitive).
+          schema:
+            type: string
+          example: Ville Platte
+        - name: type
+          in: query
+          description: Entity type.
+          schema:
+            type: string
+            enum: [LLC, Corporation, Nonprofit Corporation, Foreign Entity, Other]
+          example: LLC
+        - name: origin
+          in: query
+          description: Domestic (new in-state entity) or foreign (out-of-state entity qualifying in-state).
+          schema:
+            type: string
+            enum: [domestic, foreign]
+          example: domestic
+        - name: category
+          in: query
+          description: Industry slug from /v1/categories (inferred from the business name).
+          schema:
+            type: string
+            enum:
+              - trucking-and-transport
+              - food-and-restaurants
+              - construction-and-trades
+              - auto-services
+              - beauty-and-personal-care
+              - pet-services
+              - childcare-and-education
+              - health-wellness-and-fitness
+              - cleaning-services
+              - lawn-and-landscaping
+              - real-estate-and-property
+              - retail-and-shopping
+              - professional-services
+              - technology-and-it
+              - events-and-entertainment
+              - agriculture-and-outdoors
+              - other-unclassified
+          example: trucking-and-transport
+        - name: need
+          in: query
+          description: Likely-need segment slug from /v1/categories.
+          schema:
+            type: string
+            enum:
+              - needs-website
+              - needs-phone-internet
+              - needs-bookkeeping
+              - needs-commercial-insurance
+              - needs-signage
+              - needs-pos-system
+              - needs-hiring-help
+              - likely-hiring-cdl-drivers
+          example: likely-hiring-cdl-drivers
+        - name: age_days
+          in: query
+          description: Filed within the last N days of the dataset's newest filing (age < N; the anchor is per-state when one state is in play).
+          schema:
+            type: integer
+            minimum: 1
+          example: 90
+        - name: year
+          in: query
+          description: Calendar year of filing (YYYY).
+          schema:
+            type: string
+            pattern: '^\d{4}$'
+          example: '2025'
+        - name: from
+          in: query
+          description: Filing-date range start (YYYY-MM-DD).
+          schema:
+            type: string
+            format: date
+          example: '2026-11-20'
+        - name: to
+          in: query
+          description: Filing-date range end (YYYY-MM-DD).
+          schema:
+            type: string
+            format: date
+          example: '2026-11-21'
+        - name: limit
+          in: query
+          description: Page size, 1–100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          description: Pagination offset.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Matching filings (one page) plus the total count.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/XRateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/XRateLimitRemaining'
+            X-Plan-Tier:
+              $ref: '#/components/headers/XPlanTier'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/businesses/{charter_number}:
+    get:
+      tags: [filings]
+      summary: Look up one filing by charter number
+      description: |
+        Returns the single record for a state charter/entity number,
+        or 404. Pass `state` when a charter number exists in more than
+        one state (otherwise 400 `ambiguous_charter`). Records outside
+        the key's scope answer 404, exactly like nonexistent ones.
+      operationId: getBusiness
+      parameters:
+        - name: charter_number
+          in: path
+          required: true
+          description: The state's charter/entity number — the record's stable ID.
+          schema:
+            type: string
+          example: 47303845K
+        - name: state
+          in: query
+          description: Filing state, to disambiguate a charter number that exists in several states.
+          schema:
+            type: string
+            enum: [CO, CT, FL, IA, LA, NY, OR, PA]
+      responses:
+        '200':
+          description: The filing record.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/XRateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/XRateLimitRemaining'
+            X-Plan-Tier:
+              $ref: '#/components/headers/XPlanTier'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilingRecord'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/regions:
+    get:
+      tags: [coverage]
+      summary: Coverage by region
+      description: |
+        Filing counts by region — parishes for Louisiana, counties for
+        other states. Optional `state` narrows to one state. Counts
+        always respect the key's scope.
+      operationId: listRegions
+      parameters:
+        - name: state
+          in: query
+          description: Narrow to one filing state.
+          schema:
+            type: string
+            enum: [CO, CT, FL, IA, LA, NY, OR, PA]
+      responses:
+        '200':
+          description: Per-state region coverage.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/XRateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/XRateLimitRemaining'
+            X-Plan-Tier:
+              $ref: '#/components/headers/XPlanTier'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegionsResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/parishes:
+    get:
+      tags: [coverage]
+      summary: Louisiana parishes (alias view of /v1/regions)
+      description: Backward-compatible Louisiana coverage view — the same numbers as /v1/regions for LA.
+      operationId: listParishes
+      responses:
+        '200':
+          description: Louisiana parish coverage.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/XRateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/XRateLimitRemaining'
+            X-Plan-Tier:
+              $ref: '#/components/headers/XPlanTier'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  parishes_covered:
+                    type: integer
+                  parishes_total_in_louisiana:
+                    type: integer
+                  records_with_parish:
+                    type: integer
+                  records_total:
+                    type: integer
+                  parishes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        parish:
+                          type: string
+                        filings:
+                          type: integer
+                  scope:
+                    $ref: '#/components/schemas/Scope'
+                  scope_note:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/categories:
+    get:
+      tags: [coverage]
+      summary: Industries + need segments with live counts
+      description: |
+        Every industry category and likely-need segment with live
+        record counts. Optional `state` narrows to one state; counts
+        always respect the key's scope.
+      operationId: listCategories
+      parameters:
+        - name: state
+          in: query
+          description: Narrow counts to one filing state.
+          schema:
+            type: string
+            enum: [CO, CT, FL, IA, LA, NY, OR, PA]
+      responses:
+        '200':
+          description: Category and segment counts.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/XRateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/XRateLimitRemaining'
+            X-Plan-Tier:
+              $ref: '#/components/headers/XPlanTier'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriesResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /webhooks/vermarco:
+    get:
+      tags: [webhooks]
+      summary: Vermarco delivery endpoint liveness
+      description: |
+        Public liveness view of the Vermarco (sellmydata.ai /
+        Vertical Marketplace) delivery callback. The delivery protocol
+        itself is the POST below, authenticated by the platform's
+        Ed25519 signature — not by API key.
+      security: []
+      operationId: vermarcoLiveness
+      responses:
+        '200':
+          description: Endpoint status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  endpoint:
+                    type: string
+                  status:
+                    type: string
+                  callback_url:
+                    type: string
+                  served_vertical:
+                    type: string
+    post:
+      tags: [webhooks]
+      summary: Vermarco delivery callback
+      description: |
+        The marketplace's signed delivery endpoint. Every POST is
+        Ed25519-signed by the platform (headers X-VM-Key-Id,
+        X-VM-Signature, X-VM-Signature-Alg, X-VM-Timestamp,
+        X-VM-Body-Sha256); unsigned or badly signed requests are
+        rejected with 401.
+
+        Message types (JSON body, field `type`):
+        - `verification_challenge` — answered with `{"nonce": "<same
+          nonce>"}` within the platform's 15 s budget.
+        - `delivery_request` — answered with `{"data": {...}}`: a
+          per-query slice of filings matching the request's `query`,
+          capped under the platform's 10 MB response limit, with a
+          `__sha256` JCS (RFC 8785) integrity attestation inside
+          `data`. No matching data answers 404 / `{"available":
+          false}` and the buyer is not charged.
+        - Any other signed POST is treated as a platform probe and
+          answered `{"ok": true}`.
+      security: []
+      operationId: vermarcoCallback
+      parameters:
+        - name: X-VM-Key-Id
+          in: header
+          required: true
+          description: Platform signing key id (see GET https://vermarco.com/api/signing-key).
+          schema:
+            type: string
+        - name: X-VM-Signature
+          in: header
+          required: true
+          description: Base64url detached Ed25519 signature over "POST\n<callbackUrl>\n<timestamp>\n<body-sha256-hex>".
+          schema:
+            type: string
+        - name: X-VM-Signature-Alg
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [ed25519]
+        - name: X-VM-Timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-VM-Body-Sha256
+          in: header
+          required: true
+          description: Lowercase hex SHA-256 of the raw request body.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [verification_challenge, delivery_request]
+                nonce:
+                  type: string
+                listingId:
+                  type: string
+                fingerprint:
+                  type: string
+                title:
+                  type: string
+                verticalSlug:
+                  type: string
+                query:
+                  type: object
+                  description: Delivery filters — the same names as the /v1/businesses search parameters (state, city, parish, county, region, q, category, need, type, origin, year, from, to, age_days, limit).
+                issuedAt:
+                  type: string
+      responses:
+        '200':
+          description: 'Challenge answer ({"nonce": ...}), delivery ({"data": {...}}), availability decline ({"available": false}), or probe acknowledgement ({"ok": true}).'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key issued for this API. Tiers: Free (50 requests/day,
+        all-data scope), City Heavy $29/mo (5,000/day, one city bound
+        to the key), Full State Heavy $59/mo (10,000/day, one state
+        bound to the key).
+  headers:
+    XRateLimitLimit:
+      description: The key's daily request limit.
+      schema:
+        type: integer
+    XRateLimitRemaining:
+      description: Requests remaining today (UTC) for this key.
+      schema:
+        type: integer
+    XPlanTier:
+      description: The key's plan tier.
+      schema:
+        type: string
+  responses:
+    Error:
+      description: JSON error body.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code (e.g. invalid_or_missing_api_key, daily_quota_exceeded, not_found, bad_category, signature_verification_failed).
+        detail:
+          type: string
+        tier:
+          type: string
+        daily_limit:
+          type: integer
+        valid_categories:
+          type: array
+          items:
+            type: string
+        valid_needs:
+          type: array
+          items:
+            type: string
+      required: [error]
+    Scope:
+      type: object
+      description: The API key's bound scope.
+      properties:
+        type:
+          type: string
+          enum: [all, state, city]
+        state:
+          type: string
+        city:
+          type: string
+      required: [type]
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        dataset:
+          type: string
+        records:
+          type: integer
+          example: 5724302
+        states:
+          type: array
+          items:
+            type: string
+        records_by_state:
+          type: object
+          additionalProperties:
+            type: integer
+        data_generated_at:
+          type: string
+        filing_date_range:
+          type: array
+          items:
+            type: string
+          minItems: 2
+          maxItems: 2
+        classifier:
+          type: string
+        server_time:
+          type: string
+          format: date-time
+    FilingRecord:
+      type: object
+      description: One business filing, reproduced from the public filing as published, with derived fields documented in the API README.
+      properties:
+        id:
+          type: string
+          description: Same value as charter_number.
+        charter_number:
+          type: string
+          description: The state's charter number — the stable ID.
+        name:
+          type: string
+        name_raw:
+          type: string
+          description: Name exactly as filed.
+        entity_type:
+          type: string
+          description: Heuristic from the charter suffix (see data/SOURCES.md in the repo).
+        origin:
+          type: string
+          enum: [domestic, foreign]
+        filing_date:
+          type: string
+          format: date
+          nullable: true
+        address:
+          type: string
+          nullable: true
+          description: Mailing address as filed.
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+          description: Mailing-address state as filed — for foreign entities this is often out-of-state. Use filing_state for the state whose filings the record belongs to.
+        zip:
+          type: string
+          nullable: true
+        filing_state:
+          type: string
+          description: The state whose filings this record belongs to — what state= filtering, scope, and /v1/regions use.
+        parish:
+          type: string
+          nullable: true
+          description: Louisiana only; derived from city, null when it cannot be assigned honestly.
+        county:
+          type: string
+          nullable: true
+          description: Non-LA states, when the source provides it.
+        region:
+          type: string
+          nullable: true
+          description: The record's parish or county, whichever its state uses.
+        category:
+          type: string
+          description: Industry slug, inferred from the business name.
+        category_label:
+          type: string
+        needs:
+          type: array
+          items:
+            type: string
+          description: Likely-need segment slugs the record belongs to.
+        registered_agent:
+          type: string
+          nullable: true
+        agents:
+          type: array
+          items:
+            type: string
+        agent_is_commercial:
+          type: boolean
+          description: True when the registered agent's name matches a known commercial formation/registered-agent mill — name-matched only; the record itself is never altered or dropped.
+        email_as_filed:
+          type: string
+          nullable: true
+          description: Connecticut only — the business email the filer itself published in the state registry; a public record, not marketing consent.
+        naics_code:
+          type: string
+          nullable: true
+          description: Connecticut only — the NAICS code the filer reported to the registry.
+        naics_title:
+          type: string
+          nullable: true
+          description: Connecticut only — the NAICS title the filer reported to the registry.
+        source_file:
+          type: string
+          nullable: true
+        source_url:
+          type: string
+          nullable: true
+    SearchResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Total records matching the filters (all pages).
+        limit:
+          type: integer
+        offset:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilingRecord'
+        scope:
+          $ref: '#/components/schemas/Scope'
+        scope_note:
+          type: string
+          description: Present when the request explicitly asked outside the key's scope.
+        age_reference_date:
+          type: string
+          format: date
+          description: Present on age_days queries — the dataset date the age window is anchored to.
+      required: [count, limit, offset, results, scope]
+    RegionsResponse:
+      type: object
+      properties:
+        states:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              region_type:
+                type: string
+                enum: [parish, county]
+              regions_covered:
+                type: integer
+              records_with_region:
+                type: integer
+              records_total:
+                type: integer
+              regions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    region:
+                      type: string
+                    filings:
+                      type: integer
+        records_total:
+          type: integer
+        scope:
+          $ref: '#/components/schemas/Scope'
+        scope_note:
+          type: string
+    CategoriesResponse:
+      type: object
+      properties:
+        state:
+          type: string
+          description: The requested state, or "all".
+        total_records:
+          type: integer
+        industries:
+          type: array
+          items:
+            type: object
+            properties:
+              slug:
+                type: string
+              label:
+                type: string
+              records:
+                type: integer
+        needs:
+          type: array
+          items:
+            type: object
+            properties:
+              slug:
+                type: string
+              label:
+                type: string
+              description:
+                type: string
+              records:
+                type: integer
+        scope:
+          $ref: '#/components/schemas/Scope'
+        note:
+          type: string
+        scope_note:
+          type: string

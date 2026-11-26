@@ -46,12 +46,21 @@ single-record lookups outside the scope answer 404 — scope never leaks.
 
 Endpoints:
     GET /health
+    GET /openapi.yaml           (public OpenAPI 3 spec)
     GET /v1/businesses?q=&state=&parish=&county=&region=&city=&type=&origin=
                        &category=&need=&age_days=&year=&from=&to=&limit=&offset=
     GET /v1/businesses/{charter_number}?state=
     GET /v1/regions?state=
     GET /v1/parishes            (Louisiana alias of /v1/regions)
     GET /v1/categories?state=
+    POST /webhooks/vermarco     (Vermarco delivery callback, Ed25519-signed)
+
+CORS: every response carries `Access-Control-Allow-Origin: *` and
+OPTIONS preflights are answered for all routes. Wildcard is safe here
+because the data routes authenticate per-request with X-API-Key (no
+cookies/ambient authority) and the webhook authenticates by Ed25519
+signature. Recorded in launch-kit/STEP-A-RESULTS.md per
+launch-kit/CORS-REQUIREMENT.md.
 """
 
 import argparse
@@ -83,6 +92,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # for `import classify
 import classify as CLASSIFY
 
 CLASSIFIER_SOURCE = CLASSIFY.SOURCE
+
+# Vermarco (sellmydata.ai) delivery-endpoint support: Ed25519-signed
+# callbacks, per-query delivery slices, JCS attestation. See
+# app/vermarco.py and 85-sellmydata-bulk/RUNBOOK.md (Gate 2).
+import vermarco as VERMARCO
 
 # ---------------------------------------------------------------------------
 # Data + key stores
@@ -197,6 +211,21 @@ class KeyStore:
 STORE = None
 KEYS = None
 
+_OPENAPI_CACHE = None
+
+
+def openapi_spec_bytes():
+    """The OpenAPI spec shipped at the repo root, served at
+    /openapi.yaml. Read once and cached; None when the file is absent
+    (e.g. a partial checkout) so the route can answer an honest 404."""
+    global _OPENAPI_CACHE
+    if _OPENAPI_CACHE is None:
+        try:
+            _OPENAPI_CACHE = (ROOT / "openapi.yaml").read_bytes()
+        except OSError:
+            return None
+    return _OPENAPI_CACHE
+
 # ---------------------------------------------------------------------------
 # Scope helpers
 # ---------------------------------------------------------------------------
@@ -283,22 +312,57 @@ def scope_label(scope):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "NewBizFilingsAPI/0.3"
+    server_version = "NewBizFilingsAPI/0.4"
     protocol_version = "HTTP/1.1"
 
     # -- plumbing -----------------------------------------------------------
     def log_message(self, fmt, *args):  # keep stdout readable
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
+    # CORS (launch-kit/CORS-REQUIREMENT.md): the catalog storefront is
+    # served from a separate origin and calls /v1/* from the browser.
+    # Wildcard origin — see the module docstring for why that is safe
+    # for this API's auth models.
+    CORS_HEADERS = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "X-API-Key, Content-Type, Authorization",
+        "Access-Control-Max-Age": "86400",
+    }
+
     def send_json(self, status, obj, extra_headers=None):
         body = json.dumps(obj, indent=1).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        for k, v in (extra_headers or {}).items():
+        headers = dict(self.CORS_HEADERS)
+        headers.update(extra_headers or {})
+        for k, v in headers.items():
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
+
+    def send_bytes(self, status, body, content_type):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        for k, v in self.CORS_HEADERS.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        # CORS preflight for any route. Echo the requested headers when
+        # the browser names them; otherwise advertise the default set.
+        headers = dict(self.CORS_HEADERS)
+        requested = self.headers.get("Access-Control-Request-Headers")
+        if requested:
+            headers["Access-Control-Allow-Headers"] = requested
+        self.send_response(204)
+        self.send_header("Content-Length", "0")
+        for k, v in headers.items():
+            self.send_header(k, v)
+        self.end_headers()
 
     def authed(self):
         """Validate X-API-Key. Returns info dict or sends 401/429 and returns None."""
@@ -338,7 +402,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             return self.send_json(200, {
                 "name": "New Business Filings API",
-                "version": "0.3",
+                "version": "0.4",
                 "description": "New business filings published by state "
                                "Secretaries of State, cleaned and tagged by "
                                "region (parish/county), industry, and likely "
@@ -346,14 +410,34 @@ class Handler(BaseHTTPRequestHandler):
                                "SQLite store; new states join by rebuilding "
                                "the store with build_db.py.",
                 "docs": "See README.md",
+                "openapi": "/openapi.yaml",
                 "endpoints": {
                     "GET /health": "public health + dataset stats",
+                    "GET /openapi.yaml": "OpenAPI 3 spec for this API (public)",
                     "GET /v1/businesses": "search filings (requires X-API-Key)",
                     "GET /v1/businesses/{charter_number}": "one record (requires X-API-Key)",
                     "GET /v1/regions": "coverage by region — parishes for LA, counties elsewhere (requires X-API-Key)",
                     "GET /v1/parishes": "Louisiana parishes (alias view of /v1/regions)",
                     "GET /v1/categories": "industries + likely-need segments with live counts (requires X-API-Key)",
+                    "POST /webhooks/vermarco": "Vermarco marketplace delivery callback (Ed25519-signed, no API key)",
                 },
+            })
+
+        if path == "/openapi.yaml":
+            spec = openapi_spec_bytes()
+            if spec is None:
+                return self.send_json(404, {"error": "spec_not_found",
+                                            "detail": "openapi.yaml is not present in this deployment."})
+            return self.send_bytes(200, spec, "application/yaml")
+
+        if path == "/webhooks/vermarco":
+            # Unsigned liveness view of the delivery endpoint (the
+            # protocol itself is POST + Ed25519; see do_POST).
+            return self.send_json(200, {
+                "endpoint": "vermarco-delivery",
+                "status": "ok",
+                "callback_url": VERMARCO.CALLBACK_URL,
+                "served_vertical": VERMARCO.SERVED_VERTICAL,
             })
 
         if path == "/v1/regions":
@@ -388,6 +472,49 @@ class Handler(BaseHTTPRequestHandler):
             return self.lookup(m.group(1), qs, info)
 
         return self.send_json(404, {"error": "unknown_route", "path": path})
+
+    # -- POST routes ------------------------------------------------------------
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+        if path == "/webhooks/vermarco":
+            return self.vermarco_webhook()
+        return self.send_json(404, {"error": "unknown_route", "path": path})
+
+    def vermarco_webhook(self):
+        """Vermarco delivery callback (85-sellmydata-bulk/RUNBOOK.md Gate 2).
+
+        Auth is the platform's Ed25519 signature, NOT an API key. The
+        raw body is read first because the signature covers it.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if length <= 0 or length > 1_048_576:
+            return self.send_json(413 if length > 1_048_576 else 400,
+                                  {"error": "bad_body",
+                                   "detail": "Missing or oversized request body."})
+        raw = self.rfile.read(length)
+        proto = self.headers.get("X-Forwarded-Proto") or "http"
+        host = self.headers.get("Host") or ""
+        candidates = [VERMARCO.CALLBACK_URL]
+        derived = f"{proto}://{host}/webhooks/vermarco"
+        if derived not in candidates:
+            candidates.append(derived)
+        ok, detail = VERMARCO.verify_request(raw, self.headers, candidates)
+        if not ok:
+            sys.stderr.write(f"vermarco: rejected POST ({detail})\n")
+            return self.send_json(401, {"error": "signature_verification_failed"})
+        try:
+            body = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return self.send_json(400, {"error": "bad_json",
+                                        "detail": "Request body is not valid JSON."})
+        status, payload = VERMARCO.handle(
+            STORE, _loads_record,
+            CLASSIFY.INDUSTRY_SLUGS, CLASSIFY.NEED_SLUGS, body)
+        return self.send_json(status, payload)
 
     # -- single record --------------------------------------------------------
     def lookup(self, charter, qs, info):
