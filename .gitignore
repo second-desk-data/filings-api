@@ -1,0 +1,11 @@
+# The dataset NEVER lives in git. The deploy image carries it; this repo is code + config only.
+*.db
+data/seed.json
+data/states/
+data/*.stats.json
+# Live credentials — never commit.
+launch-kit/live-keys.local.json
+api_keys.live.json
+.build-logs/
+__pycache__/
+*.pyc

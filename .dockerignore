@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.git/
+LAUNCH-STATUS.md
+RAPIDAPI-LISTING.md
+
+# The image ships the built SQLite store, never the source JSON corpus.
+data/seed.json
+data/states/
+data/*.stats.json
+# Nor the canonical plain-text store — the image ships only the
+# compressed deploy build (data/filings.deploy.db) under the name
+# data/filings.db; keeping the 8.9 GB canonical file out of the build
+# context keeps context uploads lean.
+data/filings.db

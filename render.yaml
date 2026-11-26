@@ -1,0 +1,26 @@
+# Render blueprint — New Business Filings API (all built states, SQLite store)
+# Deploy: in the Render dashboard choose "New > Blueprint" and point it at
+# this repo, or create a Web Service manually with the Docker runtime.
+# BEFORE deploying: run `python3 build_db.py` AND
+# `python3 build_db.py --compress --out data/filings.deploy.db` — the
+# Dockerfile ships the compressed deploy store (record_json zlib-
+# compressed, ~2.2 GB smaller, responses byte-identical; see Dockerfile).
+# The server is disk-backed: it holds no records in RAM, so the full
+# 8-state store runs comfortably in the free tier's 512 MB.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: la-new-business-filings-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free # NOTE: free web services spin down after ~15 min idle and
+               # cold-start on the next request. Fine for launch validation;
+               # upgrade to a paid plan (~$7/mo) before selling subscriptions.
+    healthCheckPath: /health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      # PORT is assigned by Render automatically — do not set it here.
+      - key: API_KEYS_JSON
+        sync: false # set the real key-store JSON in the dashboard
+                    # (Environment tab). Never commit real keys to the repo.

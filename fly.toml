@@ -1,0 +1,34 @@
+# Fly.io app config — New Business Filings API (all built states, SQLite store)
+# Deploy: fly launch --no-deploy (first time, to claim the app name), then
+#         fly secrets set API_KEYS_JSON='{"keys":[...]}' and fly deploy.
+# BEFORE deploying: run `python3 build_db.py` AND
+# `python3 build_db.py --compress --out data/filings.deploy.db` — the
+# Dockerfile ships the compressed deploy store (record_json zlib-
+# compressed, ~2.2 GB smaller, responses byte-identical; see Dockerfile).
+# The app name below is a placeholder — change it if it's already taken.
+
+app = "la-new-business-filings-api"
+primary_region = "dfw" # Dallas — closest Fly region to Louisiana
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  HOST = "0.0.0.0"
+  # PORT is assigned by Fly (8080) and read by app/server.py — do not set it.
+  # API_KEYS_JSON goes in `fly secrets`, never here.
+
+[http_service]
+  internal_port = 8080 # must match the PORT Fly injects
+  force_https = true
+  auto_stop_machines = "stop" # free-tier friendly: sleep when idle
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    type = "http"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
