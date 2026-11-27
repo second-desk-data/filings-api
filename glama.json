@@ -1,0 +1,1 @@
+{"description":"MCP server for the New Business Filings API: search newly filed US business registrations across 8 states (5.7M+ records) by state, city, type, industry, and filing date.","maintainers":["second-desk-data"],"name":"New Business Filings API","server":{"entry_point":"app/mcp_server.py","transport":"streamable-http"}}
