@@ -50,6 +50,14 @@ tags:
     description: Health and service metadata
   - name: webhooks
     description: Marketplace delivery callbacks (signature-authenticated)
+  - name: catalog
+    description: The sellable catalog — every data family and pack, with counts and prices
+  - name: board
+    description: Work board — roles posted by employers, resumes listed by the candidates themselves
+  - name: keys
+    description: Self-serve API key issuance
+  - name: discovery
+    description: Agent discovery and release history
 security:
   - ApiKeyAuth: []
 paths:
@@ -555,6 +563,402 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
+  /.well-known/agent.json:
+    get:
+      tags: [system]
+      summary: Agent discovery document
+      description: |
+        Public. The machine-readable front door for AI agents: what
+        Second Desk sells, the API base, the OpenAPI and MCP
+        endpoints, the catalog endpoint, the key plans with prices,
+        and the contact email. The whole buying path — this document,
+        the catalog, key auth, data delivery, the work board — is
+        plain HTTPS plus the X-API-Key header: no browser, no
+        cookies, no JavaScript challenges.
+      security: []
+      operationId: agentCard
+      responses:
+        '200':
+          description: Agent discovery document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCard'
+  /v1/keys:
+    post:
+      tags: [keys]
+      summary: Get a free-tier API key instantly (self-serve)
+      description: |
+        Send an email address; a free-tier key comes back in the same
+        response. No browser, no human wait. The key is SHOWN ONCE and
+        stored hashed, so it cannot be recovered later — store it when
+        you receive it. One active free key per email. Rate limited to
+        5 attempts per email per hour and 10 attempts per IP per hour.
+        Free tier: 50 requests/day across all endpoints, full catalog
+        access. Every error body below includes a `next_step` field
+        telling the caller exactly what to do.
+      operationId: issueFreeKey
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyRequest'
+      responses:
+        '201':
+          description: Key issued. `api_key` appears only in this response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyIssued'
+        '400':
+          description: |
+            Bad request. `error` is one of: `invalid_email` (address
+            missing, not a string, or malformed — next step: send a
+            valid email), `missing_field` (no email field — next step:
+            send {"email": "..."}), `unexpected_field` (extra fields —
+            next step: send only the email field), `bad_json` /
+            `bad_body` (body is not a JSON object — next step: send a
+            JSON object).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: |
+            `key_already_issued` — this email already has an active
+            free key. It was shown once at issuance and is stored
+            hashed, so it cannot be shown again. Next step: use the
+            original key; if it is lost, email seconddesks@proton.me
+            from that address to revoke it, then re-issue here.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '413':
+          description: |
+            `body_too_large` — request body over 64 KB. Next step: send
+            only the small JSON body this endpoint needs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          description: |
+            `rate_limited` — more than 5 attempts for this email or 10
+            attempts from this IP in the last hour. The body carries
+            `retry_after_seconds` and the `Retry-After` header is set.
+            Next step: wait that long, then retry once.
+          headers:
+            Retry-After:
+              schema: { type: integer }
+              description: Seconds to wait before retrying.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: |
+            `key_issuance_unavailable` — issuance is not configured on
+            this deployment. Next step: email seconddesks@proton.me
+            for a key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /changelog:
+    get:
+      tags: [discovery]
+      summary: Public release history
+      description: Dated changelog entries for every release (v1 launch, v2, the agent commerce release, and onward). Public, no key required.
+      operationId: getChangelog
+      security: []
+      responses:
+        '200':
+          description: The changelog document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Changelog'
+  /v1/catalog:
+    get:
+      tags: [catalog]
+      summary: Every sellable data family
+      description: |
+        One JSON document listing every sellable family with its
+        description, pack count, record count, storefront URL and
+        the endpoint for its packs. Any valid API key may read the
+        catalog (the free key included); the catalog carries names,
+        counts and prices only — no records — so it is not
+        scope-restricted.
+      operationId: catalogIndex
+      responses:
+        '200':
+          description: The full catalog index.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogIndex'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/catalog/{family}:
+    get:
+      tags: [catalog]
+      summary: One family's packs, with prices
+      description: |
+        Every sellable pack in one family — title, record count,
+        monthly and one-time USD prices (null when the register
+        lists no price), the free-test-pack flag, and the channel
+        URL where the pack file is sold. Ordered by record count,
+        biggest first; paginate with limit/offset.
+      operationId: catalogFamily
+      parameters:
+        - name: family
+          in: path
+          required: true
+          description: Family slug from GET /v1/catalog (e.g. filings, ucc-filings, warn-act).
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Page size, 1–100 (default 25).
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          description: Paging offset (default 0).
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: The family's packs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogFamilyPage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/jobs:
+    get:
+      tags: [board]
+      summary: List open roles on the work board
+      description: |
+        Roles posted by employers through this API, newest first.
+        Filter with q (substring over title, company, location and
+        description) and location (substring). Entries show exactly
+        the fields the poster submitted.
+      operationId: listJobs
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Open roles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [board]
+      summary: Post a role to the work board
+      description: |
+        Plain data only — no file uploads. All fields are required
+        strings with length caps (title/company/location 120,
+        description 4000, contact 200); unknown fields, wrong types
+        and empty required fields are rejected with 400. The contact
+        is shown publicly on the board: post only a contact you want
+        candidates to use.
+      operationId: postJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobPost'
+      responses:
+        '201':
+          description: The created role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/jobs/{id}:
+    delete:
+      tags: [board]
+      summary: Remove a role you posted
+      description: |
+        Only the API key that posted an entry can delete it. An
+        unknown id and another poster's id answer the same 404, so
+        the board leaks nothing about other posters' entries.
+      operationId: deleteJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/resumes:
+    get:
+      tags: [board]
+      summary: Search resumes listed by the candidates themselves
+      description: |
+        Every resume here was listed by the candidate, with their
+        explicit consent, for employers to find them — nothing is
+        scraped, and the contact shown is the contact each candidate
+        chose to share. Filter with role and location (case-insensitive
+        substring matches).
+      operationId: listResumes
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Matching resume listings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [board]
+      summary: List your own resume summary
+      description: |
+        A candidate lists their OWN resume summary. The body must
+        carry "consent": true (the boolean) confirming the candidate
+        agrees to be listed for employers to find them; anything else
+        is rejected with 400 consent_required. Plain data only — no
+        file uploads. The contact field is shown publicly: share
+        only a contact you want employers to use.
+      operationId: postResume
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResumePost'
+      responses:
+        '201':
+          description: The created resume listing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resume'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /v1/resumes/{id}:
+    delete:
+      tags: [board]
+      summary: Remove your own resume listing
+      description: |
+        Only the API key that listed an entry can delete it. An
+        unknown id and another poster's id answer the same 404.
+      operationId: deleteResume
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -838,3 +1242,313 @@ components:
           type: string
         scope_note:
           type: string
+    AgentCard:
+      type: object
+      description: The /.well-known/agent.json discovery document.
+      properties:
+        name:
+          type: string
+        legal_name:
+          type: string
+        description:
+          type: string
+        site:
+          type: string
+        api_base:
+          type: string
+        openapi:
+          type: string
+        mcp_endpoint:
+          type: string
+        catalog_endpoint:
+          type: string
+        contact_email:
+          type: string
+        auth:
+          type: object
+          properties:
+            type:
+              type: string
+            header:
+              type: string
+            how_to_get_a_key:
+              type: string
+            free_key_endpoint:
+              type: string
+        plans:
+          type: array
+          items:
+            type: object
+        changelog:
+          type: string
+        pricing_policy:
+          type: string
+        endpoints:
+          type: object
+    KeyRequest:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: The key is bound to this email (one active free key per email).
+    KeyIssued:
+      type: object
+      properties:
+        api_key:
+          type: string
+          description: The new key. Shown once, in this response only; stored hashed.
+        tier:
+          type: string
+          example: free
+        daily_limit:
+          type: integer
+          example: 50
+        scope:
+          type: object
+        shown_once:
+          type: boolean
+        next_step:
+          type: string
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code.
+        detail:
+          type: string
+          description: What went wrong, in plain language.
+        next_step:
+          type: string
+          description: Exactly what the caller should do next.
+        field:
+          type: string
+          description: The offending field, when one applies.
+        retry_after_seconds:
+          type: integer
+          description: On 429, seconds to wait before retrying.
+    Changelog:
+      type: object
+      properties:
+        service:
+          type: string
+        changelog:
+          type: array
+          items:
+            type: object
+            properties:
+              version:
+                type: string
+              date:
+                type: string
+                format: date
+              title:
+                type: string
+              changes:
+                type: array
+                items:
+                  type: string
+        note:
+          type: string
+    CatalogFamilySummary:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        packs:
+          type: integer
+        records:
+          type: integer
+        site_url:
+          type: string
+        packs_endpoint:
+          type: string
+    CatalogIndex:
+      type: object
+      properties:
+        business:
+          type: string
+        site:
+          type: string
+        api_base:
+          type: string
+        generated_at:
+          type: string
+        totals:
+          type: object
+          properties:
+            families:
+              type: integer
+            packs:
+              type: integer
+            records:
+              type: integer
+        families:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogFamilySummary'
+        how_to_buy:
+          type: string
+    CatalogPack:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Stable pack id (sd-…); stable across catalog rebuilds while the pack title is unchanged.
+        title:
+          type: string
+        records:
+          type: integer
+        price_monthly_usd:
+          type: number
+          nullable: true
+        price_onetime_usd:
+          type: number
+          nullable: true
+        free:
+          type: boolean
+        state:
+          type: string
+          nullable: true
+        kind:
+          type: string
+          nullable: true
+        window:
+          type: string
+          nullable: true
+        buy_url:
+          type: string
+          nullable: true
+    CatalogFamilyPage:
+      type: object
+      properties:
+        family:
+          type: object
+          description: The family's full detail (slug, name, description, blurb, packs, records, site_url, fields, honesty, status).
+        count:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        packs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogPack'
+    JobPost:
+      type: object
+      description: All fields required; plain strings only, no file uploads.
+      properties:
+        title:
+          type: string
+          maxLength: 120
+        company:
+          type: string
+          maxLength: 120
+        location:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 4000
+        contact:
+          type: string
+          maxLength: 200
+          description: Shown publicly on the board; use a contact you want candidates to use.
+      required: [title, company, location, description, contact]
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+        title:
+          type: string
+        company:
+          type: string
+        location:
+          type: string
+        description:
+          type: string
+        contact:
+          type: string
+      required: [id, created_at, title, company, location, description, contact]
+    JobList:
+      type: object
+      properties:
+        count:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+    ResumePost:
+      type: object
+      description: A candidate lists their own resume summary. consent must be the boolean true.
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        role:
+          type: string
+          maxLength: 120
+        location:
+          type: string
+          maxLength: 120
+        experience:
+          type: string
+          maxLength: 4000
+        contact:
+          type: string
+          maxLength: 200
+          description: Shown publicly on the board; share only a contact you want employers to use.
+        consent:
+          type: boolean
+          description: Must be true — the candidate confirms they agree to be listed for employers to find them. Missing, false, or a non-boolean value is rejected with 400 consent_required.
+      required: [name, role, location, experience, contact, consent]
+    Resume:
+      type: object
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        location:
+          type: string
+        experience:
+          type: string
+        contact:
+          type: string
+      required: [id, created_at, name, role, location, experience, contact]
+    ResumeList:
+      type: object
+      properties:
+        count:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        note:
+          type: string
+        resumes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resume'

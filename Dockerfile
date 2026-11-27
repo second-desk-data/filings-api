@@ -52,6 +52,9 @@ COPY data/pack-parts/part-010 ./data/pack-parts/part-010
 COPY packs/classify.py ./packs/
 COPY api_keys.json ./api_keys.json
 COPY assemble-and-run.sh ./assemble-and-run.sh
+# The catalog store ships LAST, after the 256 MB DB part layers, so
+# rebuilding the catalog never invalidates the parts' layer cache.
+COPY data/catalog.db ./data/catalog.db
 
 ENV HOST=0.0.0.0 \
     PORT=8791 \

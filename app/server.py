@@ -54,6 +54,19 @@ Endpoints:
     GET /v1/parishes            (Louisiana alias of /v1/regions)
     GET /v1/categories?state=
     POST /webhooks/vermarco     (Vermarco delivery callback, Ed25519-signed)
+    GET /.well-known/agent.json (public agent discovery document)
+    GET /v1/catalog             (every sellable family: counts + prices)
+    GET /v1/catalog/{family}    (one family's packs with prices)
+    GET /v1/jobs, POST /v1/jobs, DELETE /v1/jobs/{id}
+    GET /v1/resumes, POST /v1/resumes, DELETE /v1/resumes/{id}
+                                (work board: roles posted by employers,
+                                resumes listed by the candidates themselves)
+
+Agent commerce: the entire buying path — catalog read, key auth, data
+delivery, the work board — is plain HTTPS + the X-API-Key header.
+No browser, no cookies, no JavaScript challenges anywhere on the API
+surface, by design: an agent that can make an HTTPS request can buy
+here. See AGENT-COMMERCE.md.
 
 CORS: every response carries `Access-Control-Allow-Origin: *` and
 OPTIONS preflights are answered for all routes. Wildcard is safe here
@@ -97,6 +110,47 @@ CLASSIFIER_SOURCE = CLASSIFY.SOURCE
 # callbacks, per-query delivery slices, JCS attestation. See
 # app/vermarco.py and 85-sellmydata-bulk/RUNBOOK.md (Gate 2).
 import vermarco as VERMARCO
+
+# Agent commerce layer: the sellable catalog (app/catalog.py, built by
+# build_catalog.py from the catalog site lane's register) and the work
+# board (app/board.py: jobs + self-listed resumes in one JSON store).
+import catalog as CATALOG_MOD
+import board as BOARD_MOD
+import keyissue as KEYISSUE_MOD
+import changelog as CHANGELOG_MOD
+
+API_PUBLIC_BASE = "https://filings-api.onrender.com"
+CONTACT_EMAIL = "seconddesks@proton.me"
+
+PRICE_LOCK_POLICY = (
+    "First-year price lock: a business that subscribes to a paid "
+    "plan during the site's first year locks that rate for life "
+    "while the plan stays continuously active; renewals always "
+    "charge the locked rate. The founding offer (first 10 direct "
+    "buyers at $49/mo locked for 12 months) stays honored, and where "
+    "both could apply the buyer keeps whichever terms are better. A "
+    "plan removed under the 30-day non-payment rule loses its lock; "
+    "a returning business pays the then-current price.")
+
+PLANS = [
+    {"name": "Free", "price_usd_monthly": 0, "daily_requests": 50,
+     "scope": "all data"},
+    {"name": "City Heavy", "price_usd_monthly": 29,
+     "daily_requests": 5000, "scope": "one city, bound to the key",
+     "price_lock": "first-year subscribers lock $29 for life while "
+                   "the plan stays continuously active"},
+    {"name": "Full State Heavy", "price_usd_monthly": 59,
+     "daily_requests": 10000, "scope": "one state, bound to the key",
+     "price_lock": "first-year subscribers lock $59 for life while "
+                   "the plan stays continuously active"},
+    {"name": "Employer", "price_usd_monthly": 20,
+     "scope": "work board: post jobs and search resumes at scale "
+              "(reading the board stays free on any key)",
+     "price_lock": "first-year subscribers lock $20 for life while "
+                   "the plan stays continuously active"},
+    {"name": "Overage", "price": "$0.005 per request beyond the "
+     "plan's daily quota, on paid plans"},
+]
 
 # ---------------------------------------------------------------------------
 # Data + key stores
@@ -193,16 +247,49 @@ class KeyStore:
         if not key or key not in self.keys:
             return False, {"error": "invalid_or_missing_api_key",
                            "detail": "Send your key in the X-API-Key header."}
-        entry = self.keys[key]
+        return self._gate(key, self.keys[key])
+
+    def _gate(self, usage_id, entry):
+        """Plan lifecycle gate (see AGENT-COMMERCE.md, 'Paid plan
+        lifecycle'): a key entry may carry status suspended/revoked,
+        set by the operator or the billing wiring. Free keys are
+        never suspended or revoked under that rule. Suspended answers
+        a clear past-due body; revoked answers as an invalid key with
+        its own code so the caller knows the difference."""
+        status = entry.get("status", "active")
+        if status == "suspended":
+            return False, {
+                "error": "plan_past_due",
+                "detail": "This plan is past due, so its keys are "
+                          "suspended until payment lands.",
+                "next_step": "Pay the outstanding balance to restore "
+                             "access. Keys are revoked 30 days after "
+                             "the missed payment."}
+        if status == "revoked":
+            return False, {
+                "error": "api_key_revoked",
+                "detail": "This key has been revoked.",
+                "next_step": "Get a new key: free keys are issued at "
+                             "POST /v1/keys; paid plans via "
+                             "seconddesks@proton.me."}
+        return self._consume(usage_id, entry)
+
+    def check_dynamic(self, usage_id, entry):
+        """Quota check for a key resolved outside the static config
+        (self-serve issued keys). usage_id is a non-secret identity
+        (the key's hash), never the raw key."""
+        return self._gate(usage_id, entry)
+
+    def _consume(self, usage_id, entry):
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         with self.lock:
-            used = self.usage[(key, today)]
+            used = self.usage[(usage_id, today)]
             limit = entry.get("daily_limit", 100)
             if used >= limit:
                 return False, {"error": "daily_quota_exceeded", "tier": entry["tier"],
                                "daily_limit": limit,
                                "detail": "Upgrade your plan for a higher daily quota."}
-            self.usage[(key, today)] = used + 1
+            self.usage[(usage_id, today)] = used + 1
             return True, {"tier": entry["tier"], "daily_limit": limit,
                           "daily_used": used + 1, "daily_remaining": limit - used - 1,
                           "scope": self.scope_of(entry)}
@@ -210,6 +297,9 @@ class KeyStore:
 
 STORE = None
 KEYS = None
+CATALOG = None
+BOARD = None
+ISSUED = None
 
 _OPENAPI_CACHE = None
 
@@ -325,7 +415,7 @@ class Handler(BaseHTTPRequestHandler):
     # for this API's auth models.
     CORS_HEADERS = {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "X-API-Key, Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",
     }
@@ -366,12 +456,30 @@ class Handler(BaseHTTPRequestHandler):
 
     def authed(self):
         """Validate X-API-Key. Returns info dict or sends 401/429 and returns None."""
-        ok, info = KEYS.check(self.headers.get("X-API-Key"))
+        raw = self.headers.get("X-API-Key")
+        ok, info = KEYS.check(raw)
+        if not ok and info.get("error") == "invalid_or_missing_api_key" \
+                and ISSUED is not None and raw:
+            entry = ISSUED.lookup(raw)
+            if entry is not None:
+                ok, info = KEYS.check_dynamic(ISSUED.usage_id(raw), entry)
         if not ok:
-            status = 429 if info.get("error") == "daily_quota_exceeded" else 401
+            status = {"daily_quota_exceeded": 429,
+                      "plan_past_due": 402}.get(info.get("error"), 401)
             self.send_json(status, info)
             return None
         return info
+
+    def client_ip(self):
+        """Client IP for rate limiting: first X-Forwarded-For hop when
+        a proxy sets it (the hosted deployment sits behind one), else
+        the socket peer."""
+        fwd = self.headers.get("X-Forwarded-For")
+        if fwd:
+            first = fwd.split(",")[0].strip()
+            if first:
+                return first[:64]
+        return self.client_address[0] if self.client_address else "unknown"
 
     def quota_headers(self, info):
         return {
@@ -420,8 +528,22 @@ class Handler(BaseHTTPRequestHandler):
                     "GET /v1/parishes": "Louisiana parishes (alias view of /v1/regions)",
                     "GET /v1/categories": "industries + likely-need segments with live counts (requires X-API-Key)",
                     "POST /webhooks/vermarco": "Vermarco marketplace delivery callback (Ed25519-signed, no API key)",
+                    "GET /.well-known/agent.json": "agent discovery document: what is sold, plans, how to buy (public)",
+                    "POST /v1/keys": "self-serve free key: send {\"email\": ...}, get a free-tier key immediately (public, rate limited, key shown once)",
+                    "GET /changelog": "public release history with dates",
+                    "GET /v1/catalog": "every sellable data family with record counts and price points (requires X-API-Key)",
+                    "GET /v1/catalog/{family}": "one family's packs with prices and record counts (requires X-API-Key)",
+                    "GET /v1/jobs": "open roles on the work board (requires X-API-Key)",
+                    "POST /v1/jobs": "post a role to the work board (requires X-API-Key)",
+                    "DELETE /v1/jobs/{id}": "remove a role you posted (requires X-API-Key)",
+                    "GET /v1/resumes": "search resumes listed by the candidates themselves (requires X-API-Key)",
+                    "POST /v1/resumes": "list your own resume summary (requires X-API-Key; consent required)",
+                    "DELETE /v1/resumes/{id}": "remove your own resume listing (requires X-API-Key)",
                 },
             })
+
+        if path == "/.well-known/agent.json":
+            return self.send_json(200, self.agent_card())
 
         if path == "/openapi.yaml":
             spec = openapi_spec_bytes()
@@ -475,6 +597,34 @@ class Handler(BaseHTTPRequestHandler):
                 return
             return self.lookup(m.group(1), qs, info)
 
+        if path == "/v1/catalog":
+            info = self.authed()
+            if info is None:
+                return
+            return self.catalog_index(info)
+
+        m = re.fullmatch(r"/v1/catalog/([a-z0-9][a-z0-9-]*)", path)
+        if m:
+            info = self.authed()
+            if info is None:
+                return
+            return self.catalog_family(m.group(1), qs, info)
+
+        if path == "/v1/jobs":
+            info = self.authed()
+            if info is None:
+                return
+            return self.board_list("jobs", qs, info)
+
+        if path == "/v1/resumes":
+            info = self.authed()
+            if info is None:
+                return
+            return self.board_list("resumes", qs, info)
+
+        if path == "/changelog":
+            return self.send_json(200, CHANGELOG_MOD.document())
+
         return self.send_json(404, {"error": "unknown_route", "path": path})
 
     # -- POST routes ------------------------------------------------------------
@@ -483,7 +633,271 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
         if path == "/webhooks/vermarco":
             return self.vermarco_webhook()
+        if path == "/v1/keys":
+            return self.key_issue()
+        if path in ("/v1/jobs", "/v1/resumes"):
+            info = self.authed()
+            if info is None:
+                return
+            return self.board_create(path.rsplit("/", 1)[1], info)
         return self.send_json(404, {"error": "unknown_route", "path": path})
+
+    # -- DELETE routes ----------------------------------------------------------
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+        m = re.fullmatch(r"/v1/(jobs|resumes)/([A-Za-z0-9-]+)", path)
+        if m:
+            info = self.authed()
+            if info is None:
+                return
+            return self.board_delete(m.group(1), m.group(2), info)
+        return self.send_json(404, {"error": "unknown_route", "path": path})
+
+    # -- agent commerce: discovery, catalog, work board -------------------------
+
+    def agent_card(self):
+        """The public discovery document at /.well-known/agent.json."""
+        return {
+            "name": "Second Desk",
+            "legal_name": "THE RAVEN AFFILIATES LLC",
+            "description": (
+                "Business data for agents and the teams behind them: "
+                "new business filings, carrier, licensing, layoff, "
+                "financial and registry datasets — read the catalog, "
+                "authenticate with an API key, and query or buy, all "
+                "server to server. No browser, no cookies, no "
+                "JavaScript challenges anywhere on this API surface."),
+            "site": "https://seconddesk.onrender.com/",
+            "api_base": API_PUBLIC_BASE,
+            "openapi": f"{API_PUBLIC_BASE}/openapi.yaml",
+            "mcp_endpoint": f"{API_PUBLIC_BASE}/mcp",
+            "catalog_endpoint": f"{API_PUBLIC_BASE}/v1/catalog",
+            "contact_email": CONTACT_EMAIL,
+            "auth": {
+                "type": "api_key",
+                "header": "X-API-Key",
+                "how_to_get_a_key": (
+                    "Self-serve: POST /v1/keys with "
+                    "{\"email\": \"you@example.com\"} and a free-tier "
+                    "key (50 requests/day, full catalog) comes back in "
+                    "the same response — no browser, no human wait. "
+                    "The key is shown once and stored hashed. Paid "
+                    f"plans: email {CONTACT_EMAIL}."),
+                "free_key_endpoint": "POST /v1/keys",
+            },
+            "plans": PLANS,
+            "pricing_policy": PRICE_LOCK_POLICY,
+            "changelog": f"{API_PUBLIC_BASE}/changelog",
+            "endpoints": {
+                "catalog": "GET /v1/catalog and "
+                           "GET /v1/catalog/{family}",
+                "data": "GET /v1/businesses, "
+                        "GET /v1/businesses/{charter_number}, "
+                        "GET /v1/regions, GET /v1/categories",
+                "work_board": "GET/POST /v1/jobs, "
+                              "GET/POST /v1/resumes",
+            },
+        }
+
+    def key_issue(self):
+        """POST /v1/keys — self-serve free key issuance. Public by
+        design (it is how an agent gets its first key); abuse is
+        bounded by per-email and per-IP rate limits, one active key
+        per email, and the free tier's 50 requests/day cap."""
+        if ISSUED is None:
+            return self.send_json(503, {
+                "error": "key_issuance_unavailable",
+                "detail": "Key issuance is not configured on this "
+                          "deployment.",
+                "next_step": f"Email {CONTACT_EMAIL} for a key."})
+        payload = self.read_json_body()
+        if payload is None:
+            return  # read_json_body already sent a clean 400/413
+        if not isinstance(payload, dict):
+            return self.send_json(400, {
+                "error": "bad_body",
+                "detail": "Request body must be a JSON object.",
+                "next_step": "Send {\"email\": \"you@example.com\"}."})
+        extra = sorted(set(payload) - {"email"})
+        if extra:
+            return self.send_json(400, {
+                "error": "unexpected_field", "field": extra[0],
+                "detail": "Only the email field is accepted.",
+                "next_step": "Send {\"email\": \"you@example.com\"}."})
+        if "email" not in payload:
+            return self.send_json(400, {
+                "error": "missing_field", "field": "email",
+                "detail": "The email field is required.",
+                "next_step": "Send {\"email\": \"you@example.com\"}."})
+        try:
+            result = ISSUED.issue(payload["email"], self.client_ip())
+        except KEYISSUE_MOD.KeyIssueError as exc:
+            headers = {}
+            if exc.status == 429 and "retry_after_seconds" in exc.payload:
+                headers["Retry-After"] = str(exc.payload["retry_after_seconds"])
+            return self.send_json(exc.status, exc.payload, headers)
+        except Exception as exc:  # never leak internals to the caller
+            print(f"key issuance error: {type(exc).__name__}",
+                  file=sys.stderr)
+            return self.send_json(500, {"error": "internal_error"})
+        return self.send_json(201, result)
+
+    def catalog_index(self, info):
+        if CATALOG is None:
+            return self.send_json(503, {
+                "error": "catalog_unavailable",
+                "detail": "The catalog store is not loaded in this "
+                          "deployment."}, self.quota_headers(info))
+        return self.send_json(200, CATALOG.document(API_PUBLIC_BASE),
+                              self.quota_headers(info))
+
+    def catalog_family(self, slug, qs, info):
+        if CATALOG is None:
+            return self.send_json(503, {
+                "error": "catalog_unavailable",
+                "detail": "The catalog store is not loaded in this "
+                          "deployment."}, self.quota_headers(info))
+        fam = CATALOG.family(slug)
+        if fam is None:
+            return self.send_json(404, {
+                "error": "unknown_family",
+                "detail": f"No data family '{slug}'.",
+                "valid_families": CATALOG.slugs},
+                self.quota_headers(info))
+        try:
+            limit = min(max(int(qs.get("limit", 25)), 1), 100)
+            offset = max(int(qs.get("offset", 0)), 0)
+        except ValueError:
+            return self.send_json(400, {
+                "error": "bad_pagination",
+                "detail": "limit and offset must be integers."},
+                self.quota_headers(info))
+        total, packs = CATALOG.packs(slug, limit, offset)
+        return self.send_json(200, {
+            "family": {k: fam[k] for k in
+                       ("slug", "name", "description", "blurb", "packs",
+                        "records", "site_url", "fields", "honesty",
+                        "status")},
+            "count": total,
+            "limit": limit,
+            "offset": offset,
+            "packs": packs,
+        }, self.quota_headers(info))
+
+    def read_json_body(self, max_bytes=65536):
+        """Read + parse a JSON request body for the board POSTs.
+
+        Returns the parsed value, or None after sending a clean error
+        (400 missing/invalid, 413 oversized). Error bodies never echo
+        the request, the key, or any internal detail."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if length <= 0:
+            self.send_json(400, {"error": "bad_body",
+                                 "detail": "Missing request body."})
+            return None
+        if length > max_bytes:
+            self.send_json(413, {"error": "body_too_large",
+                                 "detail": f"Request body exceeds "
+                                           f"{max_bytes} bytes."})
+            return None
+        raw = self.rfile.read(length)
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            self.send_json(400, {"error": "bad_json",
+                                 "detail": "Request body is not valid JSON."})
+            return None
+
+    def board_create(self, kind, info):
+        body = self.read_json_body()
+        if body is None:
+            return
+        spec = BOARD_MOD.JOB_FIELDS if kind == "jobs" \
+            else BOARD_MOD.RESUME_FIELDS
+        try:
+            fields = BOARD_MOD.validate(body, spec, kind)
+            entry = BOARD.add(kind, fields, self.headers.get("X-API-Key"))
+        except BOARD_MOD.BoardError as exc:
+            status = 429 if exc.payload.get("error") == "board_full" \
+                else 400
+            return self.send_json(status, exc.payload,
+                                  self.quota_headers(info))
+        except Exception as exc:  # never leak a trace to the client
+            sys.stderr.write(f"board: create {kind} failed: "
+                             f"{type(exc).__name__}\n")
+            return self.send_json(500, {"error": "internal_error"},
+                                  self.quota_headers(info))
+        return self.send_json(201, entry, self.quota_headers(info))
+
+    def board_list(self, kind, qs, info):
+        try:
+            limit = min(max(int(qs.get("limit", 25)), 1), 100)
+            offset = max(int(qs.get("offset", 0)), 0)
+        except ValueError:
+            return self.send_json(400, {
+                "error": "bad_pagination",
+                "detail": "limit and offset must be integers."},
+                self.quota_headers(info))
+        if kind == "jobs":
+            q = qs.get("q", "").strip()
+            loc = qs.get("location", "").strip()
+
+            def match(e):
+                if loc and not BOARD_MOD.keyword_match(e, "location", loc):
+                    return False
+                if q:
+                    hay = " ".join(e.get(f, "") for f in
+                                   ("title", "company", "location",
+                                    "description")).lower()
+                    if q.lower() not in hay:
+                        return False
+                return True
+        else:
+            role = qs.get("role", "").strip()
+            loc = qs.get("location", "").strip()
+
+            def match(e):
+                return (BOARD_MOD.keyword_match(e, "role", role)
+                        and BOARD_MOD.keyword_match(e, "location", loc))
+        try:
+            total, page = BOARD.list(kind, limit, offset, match)
+        except Exception as exc:
+            sys.stderr.write(f"board: list {kind} failed: "
+                             f"{type(exc).__name__}\n")
+            return self.send_json(500, {"error": "internal_error"},
+                                  self.quota_headers(info))
+        body = {"count": total, "limit": limit, "offset": offset,
+                kind: page}
+        if kind == "resumes":
+            body["note"] = ("Resumes are listed by the candidates "
+                            "themselves, with their consent, for "
+                            "employers to find them. Nothing here is "
+                            "scraped; the contact shown is the contact "
+                            "each candidate chose to share.")
+        return self.send_json(200, body, self.quota_headers(info))
+
+    def board_delete(self, kind, entry_id, info):
+        try:
+            removed = BOARD.delete(kind, entry_id,
+                                   self.headers.get("X-API-Key"))
+        except Exception as exc:
+            sys.stderr.write(f"board: delete {kind} failed: "
+                             f"{type(exc).__name__}\n")
+            return self.send_json(500, {"error": "internal_error"},
+                                  self.quota_headers(info))
+        if not removed:
+            # Unknown id and another poster's id answer identically:
+            # the board leaks nothing about other posters' entries.
+            return self.send_json(404, {
+                "error": "not_found",
+                "detail": "No entry with that id for your key."},
+                self.quota_headers(info))
+        return self.send_json(200, {"deleted": entry_id},
+                              self.quota_headers(info))
 
     def vermarco_webhook(self):
         """Vermarco delivery callback (85-sellmydata-bulk/RUNBOOK.md Gate 2).
@@ -867,7 +1281,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global STORE, KEYS
+    global STORE, KEYS, CATALOG, BOARD, ISSUED
     try:
         default_port = int(os.environ.get("PORT", "8791"))
     except ValueError:
@@ -883,6 +1297,16 @@ def main():
                     help="legacy: a seed JSON path — the filings.db built "
                          "beside it is used; or a .db path directly")
     ap.add_argument("--keys", default=str(ROOT / "api_keys.json"))
+    ap.add_argument("--catalog-db", default=None,
+                    help="SQLite catalog store built by build_catalog.py "
+                         "(default: data/catalog.db; when absent, "
+                         "/v1/catalog answers 503)")
+    ap.add_argument("--board-path", default=None,
+                    help="work-board JSON store (default: "
+                         "data/board.json; created on first post)")
+    ap.add_argument("--issued-keys", default=None,
+                    help="self-serve issued-keys JSON store (default: "
+                         "data/issued_keys.json; keys stored hashed)")
     args = ap.parse_args()
 
     if args.db:
@@ -909,6 +1333,28 @@ def main():
     else:
         KEYS = KeyStore(keys_path=args.keys)
         print(f"API keys loaded from {args.keys}.")
+    catalog_db = Path(args.catalog_db
+                      or os.environ.get("CATALOG_DB_PATH")
+                      or (ROOT / "data" / "catalog.db"))
+    if catalog_db.exists():
+        CATALOG = CATALOG_MOD.CatalogStore(catalog_db)
+        print(f"Catalog store {catalog_db}: "
+              f"{len(CATALOG.families)} families, "
+              f"{CATALOG.meta.get('packs')} packs.")
+    else:
+        print(f"Catalog store not found at {catalog_db}; "
+              f"/v1/catalog will answer 503.")
+    BOARD = BOARD_MOD.BoardStore(
+        Path(args.board_path or os.environ.get("BOARD_STORE_PATH")
+             or (ROOT / "data" / "board.json")))
+    print(f"Work board store: {BOARD.path} "
+          f"({len(BOARD.data['jobs'])} jobs, "
+          f"{len(BOARD.data['resumes'])} resumes).")
+    ISSUED = KEYISSUE_MOD.IssuedKeyStore(
+        Path(args.issued_keys or os.environ.get("ISSUED_KEYS_PATH")
+             or (ROOT / "data" / "issued_keys.json")))
+    print(f"Issued-keys store: {ISSUED.path} "
+          f"({len(ISSUED.state['keys'])} self-serve key(s)).")
     print(f"Serving SQLite store {db_path}: {STORE.total} records across "
           f"{len(STORE.states)} state(s) ({', '.join(STORE.states)}); "
           f"classifier: {CLASSIFIER_SOURCE}; "
