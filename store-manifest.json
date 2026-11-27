@@ -1,0 +1,153 @@
+{
+ "release_base": "https://github.com/second-desk-data/filings-api/releases/download",
+ "stores": [
+  {
+   "name": "filings",
+   "tag": "store-v9-2026-11-27",
+   "out": "data/filings.db",
+   "required": true,
+   "assembled_sha256": "9ddc3ee86be12e7615fb5f7d47b38621577c896a1c318a4de2af3610dc8863ca",
+   "assembled_bytes": 6739357696,
+   "parts": [
+    {
+     "name": "filings.part-000",
+     "sha256": "152799f3d7bd209164a1bb0ac8b5d2d482d2b4c7591375ff051408621c9bb006",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-001",
+     "sha256": "1266bf66e845f9b37105aae59fa93b921ecc66a41d8eb1c88d3a6307535199be",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-002",
+     "sha256": "33e25af4d6438fd7d8241d47a8c78b31e462177312b3d7f12430a0d29826e077",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-003",
+     "sha256": "d1cfd9b4bd2b96cd50238ca68f5f4b85e9ce351cc0bcedbd7b280e0c919457b5",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-004",
+     "sha256": "1e471cca5e307c74dc1255d5efeae2be90f99aef489194a35abf5879918f55d5",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-005",
+     "sha256": "f5d879b4637995c2390744fcbbb396dd01d4b0cfeca0a7d307c6f1f6c9f20ae3",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-006",
+     "sha256": "782ef4e1fea0335a81246d855060454bdb0a4c3fa03e55224eaaf9e7d647925e",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-007",
+     "sha256": "db9c7ca29b68f51df4a9fdb5c32b88fc01fca75e27899452216eeb594ce879db",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-008",
+     "sha256": "9b3800916a0639d2d011d8d68f42e0d4f07bad859b07f3d59c745348aba698e0",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-009",
+     "sha256": "b5eef6bbe01f16e148684bdb67b848b9a7d0131aec1ce31a724611ff01542d3d",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-010",
+     "sha256": "3d738df927e8e782c3b74332b7f2a503c4d4e673c848a03a6a848b50d013066e",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-011",
+     "sha256": "7cba4b09d535d464339e7bbcd9b7e98edf792b519c2f4ce4493ff10f6e78a3a2",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-012",
+     "sha256": "e6b702379684133efe9b9ed45e8fc93a8eb5ac2f34abe917a34a67cd3d49f7e4",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-013",
+     "sha256": "fc64e9a40ef6da1e5f7846200587cb698de226fc47b920852be4a21db2c3a875",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-014",
+     "sha256": "59407ba7c378a514eb8351238208733218b0055a2d28c584e227ce142600bb64",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-015",
+     "sha256": "d9588532c40bb555f1925ca3e73cd3d6c80ef124a8632b9b3837823697a8cd89",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-016",
+     "sha256": "48b7f9d894815dd6b099f55c608f67346d75467ee6b74ace58e15a58cf6a70be",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-017",
+     "sha256": "774547f70a286e549f288ce6898386194b0a9d3c26eb1dbbb0a8942af00823a8",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-018",
+     "sha256": "4909bdf3eef73bd109009af1ab5df728465e253bebea6a1f41287fc49965b082",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-019",
+     "sha256": "b35850ba8d4cb64517bef4fef19967c32775063ab07b33bdbd81e9b2b706f69d",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-020",
+     "sha256": "8db2c81e528392e3ebae2c447da854f56ab749f64a9a29701edd5e174434dce2",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-021",
+     "sha256": "08304d98c0362aff6fadda79007951a4f4ddbdd56b46a76397602f9c74017427",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-022",
+     "sha256": "e02f157a6eab8a1d26923fddb4d0800aed3e9c7646d8a400ec03e482fba47269",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-023",
+     "sha256": "e72ccb3fbb7046bff6f3c978ad5375d12c66df912cc99f9066005132729c7c46",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-024",
+     "sha256": "463f55e8803450b7b847fa0f7bf00d8525f8db6052afaf4723da3f78685f581d",
+     "bytes": 268435456
+    },
+    {
+     "name": "filings.part-025",
+     "sha256": "17c351f14cf305823f7a239f3bfee2ab6888f4c6650cac25861b49f2b695bdbd",
+     "bytes": 28471296
+    }
+   ]
+  },
+  {
+   "name": "packs",
+   "tag": "store-v9-2026-11-27",
+   "out": "data/packs.db",
+   "required": false,
+   "absent": true,
+   "parts": []
+  }
+ ]
+}

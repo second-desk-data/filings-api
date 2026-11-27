@@ -1,5 +1,10 @@
 # The dataset NEVER lives in git. The deploy image carries it; this repo is code + config only.
 *.db
+# Single exception: the catalog store is 16 MB of pack listing metadata
+# whose contents are already public on the catalog site, so it ships
+# with the code. The filings and packs stores travel as release assets
+# (see fetch_store.py and store-manifest.json), never in git.
+!data/catalog.db
 data/seed.json
 data/states/
 data/*.stats.json
