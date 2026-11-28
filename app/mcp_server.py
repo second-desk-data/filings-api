@@ -70,20 +70,46 @@ if not DB_PATH.exists():
     raise SystemExit(f"SQLite store not found at {DB_PATH}. "
                      f"Build it first: python3 build_db.py")
 STORE = API.Store(DB_PATH)
-if os.environ.get("API_KEYS_JSON"):
-    KEYS = API.KeyStore(cfg=json.loads(os.environ["API_KEYS_JSON"]))
-elif os.environ.get("VAULT_KEYS_TOKEN"):
+# Key store resolution identical to app/server.py: API_KEYS_JSON,
+# then the private vault store via VAULT_KEYS_TOKEN, then the
+# stage one bundled demo fallback. Presence is logged (never a
+# value) so the resolution any boot performed is provable.
+def _presence(name):
+    raw = os.environ.get(name)
+    if raw is None:
+        return "absent"
+    return "present" if raw.strip() else "present-but-empty"
+
+
+print("Key store inputs: "
+      f"API_KEYS_JSON {_presence('API_KEYS_JSON')}, "
+      f"VAULT_KEYS_TOKEN {_presence('VAULT_KEYS_TOKEN')}.")
+_env_keys = (os.environ.get("API_KEYS_JSON") or "").strip()
+_vault_token = (os.environ.get("VAULT_KEYS_TOKEN") or "").strip()
+if _env_keys:
+    KEYS = API.KeyStore(cfg=json.loads(_env_keys))
+    print("KEY STORE SOURCE: API_KEYS_JSON environment variable.")
+elif _vault_token:
     try:
-        KEYS = API.KeyStore(cfg=API.fetch_vault_key_cfg(
-            os.environ["VAULT_KEYS_TOKEN"]))
-    except Exception:
-        # Log only that the fetch failed, never content. Stage one:
-        # fall back to the bundled store, identical to app/server.py.
-        print("WARNING: vault key store fetch failed. Falling back "
-              "to the bundled key store (stage one fallback).")
+        KEYS = API.KeyStore(cfg=API.fetch_vault_key_cfg_retry(
+            _vault_token))
+    except Exception as exc:
+        # Log the error class only, never content. Stage one: fall
+        # back to the bundled store, identical to app/server.py.
+        print("WARNING: vault key store fetch failed "
+              f"({API.fetch_error_label(exc)}) after retries. "
+              "Falling back to the bundled key store "
+              "(stage one fallback).")
         KEYS = API.KeyStore(keys_path=str(ROOT / "api_keys.json"))
+        print("KEY STORE SOURCE: bundled demo file "
+              f"{ROOT / 'api_keys.json'} (stage one fallback).")
+    else:
+        print("KEY STORE SOURCE: private vault key store "
+              "(release keys-v1, fetched at startup, in memory only).")
 else:
     KEYS = API.KeyStore(keys_path=str(ROOT / "api_keys.json"))
+    print("KEY STORE SOURCE: bundled demo file "
+          f"{ROOT / 'api_keys.json'} (stage one fallback).")
 
 mcp = FastMCP(
     "New Business Filings API",

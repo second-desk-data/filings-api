@@ -43,6 +43,14 @@ environment variables, no flags needed —
                   published DEMO store) so current behavior is
                   unchanged until the vault route is proven live.
                   Stage two removes that fallback and fails closed.
+                  The variable is declared in render.yaml with
+                  sync: false, like API_KEYS_JSON, so the dashboard
+                  value is part of the service's declared environment
+                  on every deploy. At startup the server logs a
+                  "Key store inputs" line (presence only, never a
+                  value) and one "KEY STORE SOURCE" line naming the
+                  store that won, so the resolution any boot actually
+                  performed is provable from its log alone.
 
 Auth: every /v1/* route requires an `X-API-Key` header. Keys carry a tier,
 a daily request quota (in-memory counter, resets at UTC midnight), and a
@@ -93,6 +101,7 @@ import re
 import sqlite3
 import sys
 import threading
+import time
 import zlib
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -347,6 +356,32 @@ def fetch_vault_key_cfg(token):
     req = urllib.request.Request(asset["url"], headers=headers)
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read())
+
+
+def fetch_error_label(exc):
+    """One safe log token for a failed vault fetch: the exception
+    class, plus the HTTP status for an HTTPError. Never the message
+    — messages can carry URLs or payload fragments, and no key
+    material or token fragment may ever reach a log."""
+    if isinstance(exc, urllib.error.HTTPError):
+        return f"HTTPError {exc.code}"
+    return type(exc).__name__
+
+
+def fetch_vault_key_cfg_retry(token, attempts=4):
+    """fetch_vault_key_cfg with retries. A cold-starting container
+    can race its own network in the first seconds, and one transient
+    failure must not decide the key store for the life of the
+    process. Re-raises the last error after `attempts` tries."""
+    delay = 2.0
+    for attempt in range(attempts):
+        try:
+            return fetch_vault_key_cfg(token)
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delay)
+            delay *= 1.5
 
 _OPENAPI_CACHE = None
 
@@ -1371,7 +1406,28 @@ def main():
         return 1
 
     STORE = Store(db_path)
-    env_keys = os.environ.get("API_KEYS_JSON")
+    # Key store resolution — exactly one source wins, in this order:
+    #   (a) API_KEYS_JSON env var;
+    #   (b) the private vault key store, fetched with
+    #       VAULT_KEYS_TOKEN;
+    #   (c) STAGE ONE fallback: the bundled demo file.
+    # The inputs line records what this process actually saw —
+    # presence only, never a value, a fragment, or a length — so a
+    # boot whose environment did not carry a dashboard-set variable
+    # is provable from the log alone. Values are stripped before
+    # use: a dashboard paste can carry surrounding whitespace or a
+    # trailing newline, which must not change the resolution.
+    def _presence(name):
+        raw = os.environ.get(name)
+        if raw is None:
+            return "absent"
+        return "present" if raw.strip() else "present-but-empty"
+
+    print("Key store inputs: "
+          f"API_KEYS_JSON {_presence('API_KEYS_JSON')}, "
+          f"VAULT_KEYS_TOKEN {_presence('VAULT_KEYS_TOKEN')}.")
+    env_keys = (os.environ.get("API_KEYS_JSON") or "").strip()
+    vault_token = (os.environ.get("VAULT_KEYS_TOKEN") or "").strip()
     if env_keys:
         try:
             KEYS = KeyStore(cfg=json.loads(env_keys))
@@ -1379,26 +1435,31 @@ def main():
             print(f"ERROR: API_KEYS_JSON is not valid key-store JSON: {exc}",
                   file=sys.stderr)
             return 1
-        print("API keys loaded from API_KEYS_JSON environment variable.")
-    elif os.environ.get("VAULT_KEYS_TOKEN"):
+        print("KEY STORE SOURCE: API_KEYS_JSON environment variable.")
+    elif vault_token:
         try:
-            KEYS = KeyStore(cfg=fetch_vault_key_cfg(
-                os.environ["VAULT_KEYS_TOKEN"]))
-        except Exception:
-            # Log only that the fetch failed — never the payload,
-            # the token, or any key material. STAGE ONE: fall back
-            # to the bundled key store so behavior is unchanged
-            # until the vault route is proven live; stage two
-            # removes this fallback and fails closed instead.
+            KEYS = KeyStore(cfg=fetch_vault_key_cfg_retry(vault_token))
+        except Exception as exc:
+            # Log the error class only — never the payload, the
+            # token, or any key material. STAGE ONE: fall back to
+            # the bundled key store so behavior is unchanged until
+            # the vault route is proven live; stage two removes
+            # this fallback and fails closed instead.
             KEYS = KeyStore(keys_path=args.keys)
-            print("WARNING: vault key store fetch failed. Falling "
-                  f"back to {args.keys} (stage one fallback).")
+            print("WARNING: vault key store fetch failed "
+                  f"({fetch_error_label(exc)}) after retries. "
+                  f"Falling back to {args.keys} "
+                  "(stage one fallback).")
+            print("KEY STORE SOURCE: bundled demo file "
+                  f"{args.keys} (stage one fallback).")
         else:
-            print("API keys loaded from the private vault key store "
-                  "(release keys-v1, in memory only).")
+            print("KEY STORE SOURCE: private vault key store "
+                  "(release keys-v1, fetched at startup, "
+                  "in memory only).")
     else:
         KEYS = KeyStore(keys_path=args.keys)
-        print(f"API keys loaded from {args.keys}.")
+        print("KEY STORE SOURCE: bundled demo file "
+              f"{args.keys} (stage one fallback).")
     catalog_db = Path(args.catalog_db
                       or os.environ.get("CATALOG_DB_PATH")
                       or (ROOT / "data" / "catalog.db"))

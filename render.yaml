@@ -24,3 +24,14 @@ services:
       - key: API_KEYS_JSON
         sync: false # set the real key-store JSON in the dashboard
                     # (Environment tab). Never commit real keys to the repo.
+      - key: VAULT_KEYS_TOKEN
+        sync: false # read-only GitHub token for the PRIVATE
+                    # second-desk-vault repo; when API_KEYS_JSON is
+                    # unset the server fetches its key store from that
+                    # repo's keys-v1 release at startup. Declared here
+                    # so the dashboard value is part of the service's
+                    # declared environment on every deploy — an
+                    # undeclared dashboard variable did not reach the
+                    # running process on the Nov 28 stage one deploy.
+                    # Set the value in the dashboard (Environment
+                    # tab). Never commit the token to the repo.
