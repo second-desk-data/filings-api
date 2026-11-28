@@ -38,11 +38,11 @@ environment variables, no flags needed —
                   access to the PRIVATE second-desk-vault repo: the key
                   store is fetched at startup from the api-keys.json
                   asset on its keys-v1 release and held in memory only.
-                  A failed fetch fails closed.
-                  When neither variable is set (and no --keys file is
-                  passed for local work) the server FAILS CLOSED with an
-                  empty key store: the bundled api_keys.json holds
-                  published DEMO keys and is never loaded by default.
+                  STAGE ONE: a failed fetch, or neither variable being
+                  set, falls back to the bundled api_keys.json (the
+                  published DEMO store) so current behavior is
+                  unchanged until the vault route is proven live.
+                  Stage two removes that fallback and fails closed.
 
 Auth: every /v1/* route requires an `X-API-Key` header. Keys carry a tier,
 a daily request quota (in-memory counter, resets at UTC midnight), and a
@@ -317,7 +317,8 @@ ISSUED = None
 # VAULT_KEYS_TOKEN is set, the key store is fetched at startup from
 # the api-keys.json asset on the keys-v1 release of the PRIVATE
 # second-desk-vault repo. The store is held in memory only — never
-# written to disk — and any failure fails closed (see main()).
+# written to disk. Stage one keeps the bundled-file fallback on any
+# failure (see main()); stage two fails closed instead.
 # VAULT_KEYS_RELEASE_URL overrides the release API URL for tests.
 VAULT_KEYS_RELEASE_URL = os.environ.get(
     "VAULT_KEYS_RELEASE_URL",
@@ -1342,11 +1343,10 @@ def main():
     ap.add_argument("--data", default=str(ROOT / "data" / "seed.json"),
                     help="legacy: a seed JSON path — the filings.db built "
                          "beside it is used; or a .db path directly")
-    ap.add_argument("--keys", default=None,
-                    help="key-store JSON file (local development only; "
-                         "deployments must use API_KEYS_JSON — when "
-                         "neither is given the server fails closed and "
-                         "every keyed route answers 401)")
+    ap.add_argument("--keys", default=str(ROOT / "api_keys.json"),
+                    help="fallback key-store JSON file, loaded only "
+                         "when neither API_KEYS_JSON nor a successful "
+                         "VAULT_KEYS_TOKEN fetch provides a store")
     ap.add_argument("--catalog-db", default=None,
                     help="SQLite catalog store built by build_catalog.py "
                          "(default: data/catalog.db; when absent, "
@@ -1385,27 +1385,20 @@ def main():
             KEYS = KeyStore(cfg=fetch_vault_key_cfg(
                 os.environ["VAULT_KEYS_TOKEN"]))
         except Exception:
-            # Fail closed, and log only that the fetch failed —
-            # never the payload, the token, or any key material.
-            KEYS = KeyStore(cfg={"keys": []})
-            print("WARNING: vault key store fetch failed. Failing "
-                  "closed: every keyed route will answer 401.")
+            # Log only that the fetch failed — never the payload,
+            # the token, or any key material. STAGE ONE: fall back
+            # to the bundled key store so behavior is unchanged
+            # until the vault route is proven live; stage two
+            # removes this fallback and fails closed instead.
+            KEYS = KeyStore(keys_path=args.keys)
+            print("WARNING: vault key store fetch failed. Falling "
+                  f"back to {args.keys} (stage one fallback).")
         else:
             print("API keys loaded from the private vault key store "
                   "(release keys-v1, in memory only).")
-    elif args.keys:
+    else:
         KEYS = KeyStore(keys_path=args.keys)
         print(f"API keys loaded from {args.keys}.")
-    else:
-        # Fail closed: a deployment with no key store configured must
-        # never fall back to the bundled api_keys.json — those are DEMO
-        # keys published in this repo, so loading them would hand the
-        # full store to anyone. An empty store 401s every keyed route
-        # until API_KEYS_JSON is set on the host.
-        KEYS = KeyStore(cfg={"keys": []})
-        print("WARNING: no API key store configured (API_KEYS_JSON is "
-              "unset and no --keys file was given). Failing closed: "
-              "every keyed route will answer 401.")
     catalog_db = Path(args.catalog_db
                       or os.environ.get("CATALOG_DB_PATH")
                       or (ROOT / "data" / "catalog.db"))

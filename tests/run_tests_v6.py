@@ -8,11 +8,15 @@ v6 test battery — key store resolution order (Nov 28, 2026):
                                       from the private vault release
                                       (a local stub stands in for the
                                       GitHub API; a fake token only).
-  (b2) vault fetch fails           -> fail closed: every key 401,
-                                      /health still 200.
-  (c) neither variable set         -> fail closed: the bundled DEMO
-                                      keys in api_keys.json are NOT
-                                      loaded and answer 401.
+  (b2) vault fetch fails           -> STAGE ONE: fall back to the
+                                      bundled store (demo keys work,
+                                      vault keys 401), /health 200.
+  (c) neither variable set         -> STAGE ONE: the bundled DEMO
+                                      store in api_keys.json is the
+                                      fallback and answers 200.
+  Stage two flips (b2) and (c) to fail closed (every key 401); the
+  checks below are written for the stage being deployed and are
+  updated in the stage two commit.
 
 Boots app/server.py against the tiny v2 fixture store. No real
 token, no real asset, no network beyond 127.0.0.1.
@@ -199,7 +203,7 @@ def main():
     check("(b) boot log names the vault key store",
           "private vault key store" in log)
 
-    # (b2) vault fetch failure fails closed ----------------------------------
+    # (b2) vault fetch failure: stage one falls back -------------------------
     proc = boot(8983, db, {"VAULT_KEYS_TOKEN": "wrong-token",
                            "VAULT_KEYS_RELEASE_URL": stub_url})
     try:
@@ -207,8 +211,8 @@ def main():
         check("(b2) failed fetch: vault key refused", s == 401,
               f"HTTP {s}")
         s, _ = probe(8983, DATA, DEMO_PRO)
-        check("(b2) failed fetch: demo pro key refused", s == 401,
-              f"HTTP {s}")
+        check("(b2) failed fetch: stage one fallback serves demo keys",
+              s == 200, f"HTTP {s}")
         s, _ = probe(8983, "/health")
         check("(b2) failed fetch: /health still 200", s == 200,
               f"HTTP {s}")
@@ -216,14 +220,15 @@ def main():
         log = stop(proc)
     check("(b2) boot log records the failure without content",
           "vault key store fetch failed" in log
+          and "Falling back" in log
           and "v6-vault-key" not in log)
 
-    # (c) neither variable: fail closed --------------------------------------
+    # (c) neither variable: stage one bundled fallback ------------------------
     proc = boot(8984, db, {})
     try:
         s, _ = probe(8984, DATA, DEMO_PRO)
-        check("(c) no store configured: demo pro key refused",
-              s == 401, f"HTTP {s}")
+        check("(c) no store configured: stage one fallback serves "
+              "demo keys", s == 200, f"HTTP {s}")
         s, _ = probe(8984, DATA)
         check("(c) no store configured: missing key refused",
               s == 401, f"HTTP {s}")
