@@ -31,8 +31,18 @@ environment variables, no flags needed —
     PORT          listen port (default 8791; the host assigns this)
     HOST          bind address (default 127.0.0.1; deploy configs set 0.0.0.0)
     API_KEYS_JSON full key-store JSON (same shape as api_keys.json); when set
-                  it replaces the api_keys.json file. Keep real keys ONLY in
+                  it is the deployment's key store. Keep real keys ONLY in
                   this variable on the host — never commit them.
+    VAULT_KEYS_TOKEN
+                  when API_KEYS_JSON is unset, a GitHub token with read
+                  access to the PRIVATE second-desk-vault repo: the key
+                  store is fetched at startup from the api-keys.json
+                  asset on its keys-v1 release and held in memory only.
+                  A failed fetch fails closed.
+                  When neither variable is set (and no --keys file is
+                  passed for local work) the server FAILS CLOSED with an
+                  empty key store: the bundled api_keys.json holds
+                  published DEMO keys and is never loaded by default.
 
 Auth: every /v1/* route requires an `X-API-Key` header. Keys carry a tier,
 a daily request quota (in-memory counter, resets at UTC midnight), and a
@@ -89,6 +99,8 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+import urllib.error
+import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # for `import classify`
@@ -300,6 +312,40 @@ KEYS = None
 CATALOG = None
 BOARD = None
 ISSUED = None
+
+# Private key store route: when API_KEYS_JSON is unset but
+# VAULT_KEYS_TOKEN is set, the key store is fetched at startup from
+# the api-keys.json asset on the keys-v1 release of the PRIVATE
+# second-desk-vault repo. The store is held in memory only — never
+# written to disk — and any failure fails closed (see main()).
+# VAULT_KEYS_RELEASE_URL overrides the release API URL for tests.
+VAULT_KEYS_RELEASE_URL = os.environ.get(
+    "VAULT_KEYS_RELEASE_URL",
+    "https://api.github.com/repos/second-desk-data/second-desk-vault"
+    "/releases/tags/keys-v1")
+VAULT_KEYS_ASSET_NAME = "api-keys.json"
+
+
+def fetch_vault_key_cfg(token):
+    """Fetch and parse the key store JSON from the private vault
+    release. Returns the parsed config (same shape as api_keys.json).
+    Raises on any network, HTTP, or parse failure; callers fail
+    closed. The response content is key material: it is returned to
+    the caller only, never logged."""
+    headers = {"Authorization": f"Bearer {token}",
+               "Accept": "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28"}
+    req = urllib.request.Request(VAULT_KEYS_RELEASE_URL, headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        release = json.loads(resp.read())
+    asset = next((a for a in release.get("assets", [])
+                  if a.get("name") == VAULT_KEYS_ASSET_NAME), None)
+    if asset is None:
+        raise ValueError("vault release carries no api-keys.json asset")
+    headers = dict(headers, Accept="application/octet-stream")
+    req = urllib.request.Request(asset["url"], headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
 
 _OPENAPI_CACHE = None
 
@@ -1296,7 +1342,11 @@ def main():
     ap.add_argument("--data", default=str(ROOT / "data" / "seed.json"),
                     help="legacy: a seed JSON path — the filings.db built "
                          "beside it is used; or a .db path directly")
-    ap.add_argument("--keys", default=str(ROOT / "api_keys.json"))
+    ap.add_argument("--keys", default=None,
+                    help="key-store JSON file (local development only; "
+                         "deployments must use API_KEYS_JSON — when "
+                         "neither is given the server fails closed and "
+                         "every keyed route answers 401)")
     ap.add_argument("--catalog-db", default=None,
                     help="SQLite catalog store built by build_catalog.py "
                          "(default: data/catalog.db; when absent, "
@@ -1330,9 +1380,32 @@ def main():
                   file=sys.stderr)
             return 1
         print("API keys loaded from API_KEYS_JSON environment variable.")
-    else:
+    elif os.environ.get("VAULT_KEYS_TOKEN"):
+        try:
+            KEYS = KeyStore(cfg=fetch_vault_key_cfg(
+                os.environ["VAULT_KEYS_TOKEN"]))
+        except Exception:
+            # Fail closed, and log only that the fetch failed —
+            # never the payload, the token, or any key material.
+            KEYS = KeyStore(cfg={"keys": []})
+            print("WARNING: vault key store fetch failed. Failing "
+                  "closed: every keyed route will answer 401.")
+        else:
+            print("API keys loaded from the private vault key store "
+                  "(release keys-v1, in memory only).")
+    elif args.keys:
         KEYS = KeyStore(keys_path=args.keys)
         print(f"API keys loaded from {args.keys}.")
+    else:
+        # Fail closed: a deployment with no key store configured must
+        # never fall back to the bundled api_keys.json — those are DEMO
+        # keys published in this repo, so loading them would hand the
+        # full store to anyone. An empty store 401s every keyed route
+        # until API_KEYS_JSON is set on the host.
+        KEYS = KeyStore(cfg={"keys": []})
+        print("WARNING: no API key store configured (API_KEYS_JSON is "
+              "unset and no --keys file was given). Failing closed: "
+              "every keyed route will answer 401.")
     catalog_db = Path(args.catalog_db
                       or os.environ.get("CATALOG_DB_PATH")
                       or (ROOT / "data" / "catalog.db"))

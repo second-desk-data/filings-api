@@ -26,8 +26,11 @@ quota, so every call needs a key from the same key store:
     * streamable-http transport: send the key in the X-API-Key header
       of the MCP HTTP requests (read per-request); FILINGS_API_KEY is
       the fallback when no header is present.
-Keys come from API_KEYS_JSON (same shape as the REST server) or the
-api_keys.json file (DEMO keys) — identical semantics to app/server.py.
+Keys come from API_KEYS_JSON (same shape as the REST server), or
+from the private vault key store when VAULT_KEYS_TOKEN is set —
+identical semantics to app/server.py. With neither variable set the
+server fails closed with an empty key store; the bundled
+api_keys.json (published DEMO keys) is never loaded by default.
 
 Data store: FILINGS_DB env var, else data/filings.db beside the repo
 root (build it with build_db.py), exactly like the REST server.
@@ -68,8 +71,19 @@ if not DB_PATH.exists():
 STORE = API.Store(DB_PATH)
 if os.environ.get("API_KEYS_JSON"):
     KEYS = API.KeyStore(cfg=json.loads(os.environ["API_KEYS_JSON"]))
+elif os.environ.get("VAULT_KEYS_TOKEN"):
+    try:
+        KEYS = API.KeyStore(cfg=API.fetch_vault_key_cfg(
+            os.environ["VAULT_KEYS_TOKEN"]))
+    except Exception:
+        # Fail closed; log only that the fetch failed, never content.
+        print("WARNING: vault key store fetch failed. Failing closed.")
+        KEYS = API.KeyStore(cfg={"keys": []})
 else:
-    KEYS = API.KeyStore(keys_path=str(ROOT / "api_keys.json"))
+    # Fail closed, identical to app/server.py: never fall back to the
+    # bundled api_keys.json — those are DEMO keys published in this
+    # repo. With no key store configured, every call is refused.
+    KEYS = API.KeyStore(cfg={"keys": []})
 
 mcp = FastMCP(
     "New Business Filings API",
