@@ -8,15 +8,16 @@ v6 test battery — key store resolution order (Nov 28, 2026):
                                       from the private vault release
                                       (a local stub stands in for the
                                       GitHub API; a fake token only).
-  (b2) vault fetch fails           -> STAGE ONE: fall back to the
-                                      bundled store (demo keys work,
-                                      vault keys 401), /health 200.
-  (c) neither variable set         -> STAGE ONE: the bundled DEMO
-                                      store in api_keys.json is the
-                                      fallback and answers 200.
-  Stage two flips (b2) and (c) to fail closed (every key 401); the
-  checks below are written for the stage being deployed and are
-  updated in the stage two commit.
+  (b2) vault fetch fails           -> STAGE TWO: fail closed — the
+                                      process exits before serving
+                                      anything; no key answers, and
+                                      /health is down with it.
+  (c) neither variable set         -> STAGE TWO: fail closed — the
+                                      process exits before serving
+                                      anything; no key answers.
+  Stage one kept (b2) and (c) on the bundled demo fallback; stage
+  two (Nov 28, 2026) flips both to fail closed, and the checks
+  below are written for that stage.
 
 Boots app/server.py against the tiny v2 fixture store. No real
 token, no real asset, no network beyond 127.0.0.1.
@@ -156,6 +157,40 @@ def stop(proc):
     return out or ""
 
 
+def boot_fails(port, db, extra_env):
+    """Boot a server that must refuse to start (stage two fail
+    closed). Returns (exit_code, captured log). Raises SystemExit
+    if the server stays up instead of exiting."""
+    env = dict(os.environ)
+    for name in ("API_KEYS_JSON", "VAULT_KEYS_TOKEN",
+                 "VAULT_KEYS_RELEASE_URL"):
+        env.pop(name, None)
+    env.update(extra_env)
+    env["PYTHONUNBUFFERED"] = "1"
+    proc = subprocess.Popen(
+        [sys.executable, str(ROOT / "app" / "server.py"),
+         "--db", str(db), "--port", str(port)],
+        env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True)
+    try:
+        out, _ = proc.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        out, _ = proc.communicate()
+        raise SystemExit(f"server on {port} stayed up; expected it "
+                         f"to refuse to start:\n{out}")
+    return proc.returncode, out or ""
+
+
+def _up(port):
+    """True only if /health answers 200 on the given port."""
+    try:
+        status, _ = probe(port, "/health")
+        return status == 200
+    except Exception:
+        return False
+
+
 DATA = "/v1/businesses?state=LA&limit=1"
 
 
@@ -203,40 +238,32 @@ def main():
     check("(b) boot log names the vault key store",
           "private vault key store" in log)
 
-    # (b2) vault fetch failure: stage one falls back -------------------------
-    proc = boot(8983, db, {"VAULT_KEYS_TOKEN": "wrong-token",
-                           "VAULT_KEYS_RELEASE_URL": stub_url})
-    try:
-        s, _ = probe(8983, DATA, "v6-vault-key")
-        check("(b2) failed fetch: vault key refused", s == 401,
-              f"HTTP {s}")
-        s, _ = probe(8983, DATA, DEMO_PRO)
-        check("(b2) failed fetch: stage one fallback serves demo keys",
-              s == 200, f"HTTP {s}")
-        s, _ = probe(8983, "/health")
-        check("(b2) failed fetch: /health still 200", s == 200,
-              f"HTTP {s}")
-    finally:
-        log = stop(proc)
-    check("(b2) boot log records the failure without content",
-          "vault key store fetch failed" in log
-          and "Falling back" in log
-          and "v6-vault-key" not in log)
+    # (b2) vault fetch failure: stage two fails closed ------------------
+    code, log = boot_fails(8983, db, {"VAULT_KEYS_TOKEN": "wrong-token",
+                                      "VAULT_KEYS_RELEASE_URL": stub_url})
+    check("(b2) failed fetch: server refuses to start", code != 0,
+          f"exit {code}")
+    check("(b2) failed fetch: log names the error class",
+          "ERROR: vault key store fetch failed (HTTPError 401)" in log)
+    check("(b2) failed fetch: log says it refuses to start",
+          "refusing to start without a key store" in log)
+    check("(b2) failed fetch: no demo fallback in the log",
+          "bundled demo file" not in log and "Falling back" not in log)
+    check("(b2) failed fetch: the token never reaches the log",
+          "wrong-token" not in log)
+    check("(b2) failed fetch: /health is down with the server",
+          not _up(8983))
 
-    # (c) neither variable: stage one bundled fallback ------------------------
-    proc = boot(8984, db, {})
-    try:
-        s, _ = probe(8984, DATA, DEMO_PRO)
-        check("(c) no store configured: stage one fallback serves "
-              "demo keys", s == 200, f"HTTP {s}")
-        s, _ = probe(8984, DATA)
-        check("(c) no store configured: missing key refused",
-              s == 401, f"HTTP {s}")
-        s, _ = probe(8984, "/health")
-        check("(c) no store configured: /health still 200", s == 200,
-              f"HTTP {s}")
-    finally:
-        stop(proc)
+    # (c) neither variable: stage two fails closed ------------------------
+    code, log = boot_fails(8984, db, {})
+    check("(c) no store configured: server refuses to start",
+          code != 0, f"exit {code}")
+    check("(c) no store configured: log names the missing store",
+          "ERROR: no key store configured" in log)
+    check("(c) no store configured: no demo fallback in the log",
+          "bundled demo file" not in log)
+    check("(c) no store configured: /health is down with the server",
+          not _up(8984))
 
     stub.shutdown()
     passed = sum(CHECKS)

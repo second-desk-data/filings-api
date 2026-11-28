@@ -18,14 +18,16 @@ conditions and the new boot diagnostics:
        a KEY STORE SOURCE line naming the vault.
   (d2) VAULT_KEYS_TOKEN present but EMPTY (a dashboard variable
        saved with no value) -> the inputs line says
-       present-but-empty, the stage one demo fallback serves, and
-       the boot is distinguishable from (d1) by its log alone.
+       present-but-empty, the process refuses to start (stage
+       two: no demo fallback), and the boot is distinguishable
+       from (d1) by its log alone.
   (d3) VAULT_KEYS_TOKEN wrapped in whitespace and a trailing
        newline (a dashboard paste artifact) -> the value is
        stripped and the vault fetch still succeeds.
   (d4) VAULT_KEYS_TOKEN wrong (the stub answers 401) -> the
-       fallback serves, and the WARNING line names the error class
-       (HTTPError 401) while the token itself never reaches the log.
+       process refuses to start (stage two: no demo fallback),
+       and the ERROR line names the error class (HTTPError 401)
+       while the token itself never reaches the log.
 
 Boots app/server.py against the tiny v2 fixture store and the v6
 local GitHub stub. No real token, no real asset, no network beyond
@@ -87,24 +89,17 @@ def main():
           v6.FAKE_TOKEN not in log)
 
     # (d2) token present but empty ------------------------------------
-    proc = v6.boot(8992, db, {"VAULT_KEYS_TOKEN": "",
-                              "VAULT_KEYS_RELEASE_URL": stub_url})
-    try:
-        s, _ = v6.probe(8992, DATA, v6.DEMO_PRO)
-        check("(d2) empty token: stage one fallback serves demo keys",
-              s == 200, f"HTTP {s}")
-        s, _ = v6.probe(8992, DATA, VAULT_KEY)
-        check("(d2) empty token: vault key refused", s == 401,
-              f"HTTP {s}")
-        s, _ = v6.probe(8992, "/health")
-        check("(d2) empty token: /health still 200", s == 200,
-              f"HTTP {s}")
-    finally:
-        log = v6.stop(proc)
+    code, log = v6.boot_fails(8992, db, {"VAULT_KEYS_TOKEN": "",
+                                         "VAULT_KEYS_RELEASE_URL": stub_url})
+    check("(d2) empty token: server refuses to start", code != 0,
+          f"exit {code}")
     check("(d2) inputs line records the token as present-but-empty",
           "VAULT_KEYS_TOKEN present-but-empty." in log)
-    check("(d2) source line names the bundled demo fallback",
-          "KEY STORE SOURCE: bundled demo file" in log)
+    check("(d2) log names the missing store",
+          "ERROR: no key store configured" in log)
+    check("(d2) no demo fallback in the log",
+          "bundled demo file" not in log)
+    check("(d2) /health is down with the server", not v6._up(8992))
 
     # (d3) token wrapped in whitespace --------------------------------
     proc = v6.boot(8993, db, {
@@ -120,23 +115,17 @@ def main():
           "KEY STORE SOURCE: private vault key store" in log)
 
     # (d4) wrong token: fetch fails with an HTTP error -----------------
-    proc = v6.boot(8994, db, {"VAULT_KEYS_TOKEN": "wrong-token",
-                              "VAULT_KEYS_RELEASE_URL": stub_url})
-    try:
-        s, _ = v6.probe(8994, DATA, v6.DEMO_PRO)
-        check("(d4) failed fetch: stage one fallback serves demo keys",
-              s == 200, f"HTTP {s}")
-        s, _ = v6.probe(8994, DATA, VAULT_KEY)
-        check("(d4) failed fetch: vault key refused", s == 401,
-              f"HTTP {s}")
-    finally:
-        log = v6.stop(proc)
-    check("(d4) warning line names the error class",
-          "vault key store fetch failed (HTTPError 401)" in log)
-    check("(d4) source line names the bundled demo fallback",
-          "KEY STORE SOURCE: bundled demo file" in log)
+    code, log = v6.boot_fails(8994, db, {"VAULT_KEYS_TOKEN": "wrong-token",
+                                         "VAULT_KEYS_RELEASE_URL": stub_url})
+    check("(d4) failed fetch: server refuses to start", code != 0,
+          f"exit {code}")
+    check("(d4) error line names the error class",
+          "ERROR: vault key store fetch failed (HTTPError 401)" in log)
+    check("(d4) no demo fallback in the log",
+          "bundled demo file" not in log and "Falling back" not in log)
     check("(d4) the token never reaches the log",
           "wrong-token" not in log)
+    check("(d4) /health is down with the server", not v6._up(8994))
 
     stub.shutdown()
     passed = sum(CHECKS)

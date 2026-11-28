@@ -38,19 +38,19 @@ environment variables, no flags needed —
                   access to the PRIVATE second-desk-vault repo: the key
                   store is fetched at startup from the api-keys.json
                   asset on its keys-v1 release and held in memory only.
-                  STAGE ONE: a failed fetch, or neither variable being
-                  set, falls back to the bundled api_keys.json (the
-                  published DEMO store) so current behavior is
-                  unchanged until the vault route is proven live.
-                  Stage two removes that fallback and fails closed.
-                  The variable is declared in render.yaml with
-                  sync: false, like API_KEYS_JSON, so the dashboard
-                  value is part of the service's declared environment
-                  on every deploy. At startup the server logs a
-                  "Key store inputs" line (presence only, never a
-                  value) and one "KEY STORE SOURCE" line naming the
-                  store that won, so the resolution any boot actually
-                  performed is provable from its log alone.
+                  STAGE TWO (Nov 28, 2026): there is no fallback. A
+                  failed fetch, or neither variable being set, refuses
+                  to start: the process exits with an error before
+                  serving anything, so a demo key can never answer
+                  200 on a live deploy. The variable is declared in
+                  render.yaml with sync: false, like API_KEYS_JSON,
+                  so the dashboard value is part of the service's
+                  declared environment on every deploy. At startup
+                  the server logs a "Key store inputs" line (presence
+                  only, never a value) and one "KEY STORE SOURCE"
+                  line naming the store that won, so the resolution
+                  any boot actually performed is provable from its
+                  log alone.
 
 Auth: every /v1/* route requires an `X-API-Key` header. Keys carry a tier,
 a daily request quota (in-memory counter, resets at UTC midnight), and a
@@ -326,8 +326,8 @@ ISSUED = None
 # VAULT_KEYS_TOKEN is set, the key store is fetched at startup from
 # the api-keys.json asset on the keys-v1 release of the PRIVATE
 # second-desk-vault repo. The store is held in memory only — never
-# written to disk. Stage one keeps the bundled-file fallback on any
-# failure (see main()); stage two fails closed instead.
+# written to disk. There is no fallback: a failed fetch refuses to
+# start (see main()).
 # VAULT_KEYS_RELEASE_URL overrides the release API URL for tests.
 VAULT_KEYS_RELEASE_URL = os.environ.get(
     "VAULT_KEYS_RELEASE_URL",
@@ -1378,10 +1378,13 @@ def main():
     ap.add_argument("--data", default=str(ROOT / "data" / "seed.json"),
                     help="legacy: a seed JSON path — the filings.db built "
                          "beside it is used; or a .db path directly")
-    ap.add_argument("--keys", default=str(ROOT / "api_keys.json"),
-                    help="fallback key-store JSON file, loaded only "
-                         "when neither API_KEYS_JSON nor a successful "
-                         "VAULT_KEYS_TOKEN fetch provides a store")
+    ap.add_argument("--keys", default=None,
+                    help="explicit key-store JSON file for local runs "
+                         "and tests, used only when neither "
+                         "API_KEYS_JSON nor a successful "
+                         "VAULT_KEYS_TOKEN fetch provides a store. "
+                         "The bundled api_keys.json (demo keys) is "
+                         "never loaded by default.")
     ap.add_argument("--catalog-db", default=None,
                     help="SQLite catalog store built by build_catalog.py "
                          "(default: data/catalog.db; when absent, "
@@ -1410,7 +1413,10 @@ def main():
     #   (a) API_KEYS_JSON env var;
     #   (b) the private vault key store, fetched with
     #       VAULT_KEYS_TOKEN;
-    #   (c) STAGE ONE fallback: the bundled demo file.
+    #   (c) an explicitly passed --keys file (local runs and tests
+    #       only — the live service passes no flags).
+    # There is no fallback to the bundled demo file: a failed vault
+    # fetch, or no key store configured at all, refuses to start.
     # The inputs line records what this process actually saw —
     # presence only, never a value, a fragment, or a length — so a
     # boot whose environment did not carry a dashboard-set variable
@@ -1441,25 +1447,30 @@ def main():
             KEYS = KeyStore(cfg=fetch_vault_key_cfg_retry(vault_token))
         except Exception as exc:
             # Log the error class only — never the payload, the
-            # token, or any key material. STAGE ONE: fall back to
-            # the bundled key store so behavior is unchanged until
-            # the vault route is proven live; stage two removes
-            # this fallback and fails closed instead.
+            # token, or any key material. STAGE TWO: fail closed.
+            # The process exits before serving anything, so no key
+            # — real or demo — can answer while the store is bad.
+            print(f"ERROR: vault key store fetch failed "
+                  f"({fetch_error_label(exc)}) after retries; "
+                  "refusing to start without a key store.",
+                  file=sys.stderr)
+            return 1
+        print("KEY STORE SOURCE: private vault key store "
+              "(release keys-v1, fetched at startup, "
+              "in memory only).")
+    elif args.keys:
+        try:
             KEYS = KeyStore(keys_path=args.keys)
-            print("WARNING: vault key store fetch failed "
-                  f"({fetch_error_label(exc)}) after retries. "
-                  f"Falling back to {args.keys} "
-                  "(stage one fallback).")
-            print("KEY STORE SOURCE: bundled demo file "
-                  f"{args.keys} (stage one fallback).")
-        else:
-            print("KEY STORE SOURCE: private vault key store "
-                  "(release keys-v1, fetched at startup, "
-                  "in memory only).")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"ERROR: --keys file {args.keys} is not a valid "
+                  f"key store: {exc}", file=sys.stderr)
+            return 1
+        print(f"KEY STORE SOURCE: explicit key file {args.keys}.")
     else:
-        KEYS = KeyStore(keys_path=args.keys)
-        print("KEY STORE SOURCE: bundled demo file "
-              f"{args.keys} (stage one fallback).")
+        print("ERROR: no key store configured: set API_KEYS_JSON "
+              "or VAULT_KEYS_TOKEN; refusing to start without a "
+              "key store.", file=sys.stderr)
+        return 1
     catalog_db = Path(args.catalog_db
                       or os.environ.get("CATALOG_DB_PATH")
                       or (ROOT / "data" / "catalog.db"))
@@ -1495,4 +1506,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main() returns 1 on a fail-closed refusal (bad key store,
+    # missing DB); that must reach the process exit code, or a
+    # supervisor reads a clean exit for a server that never served.
+    sys.exit(main())

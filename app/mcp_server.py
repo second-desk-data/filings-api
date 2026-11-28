@@ -28,10 +28,10 @@ quota, so every call needs a key from the same key store:
       the fallback when no header is present.
 Keys come from API_KEYS_JSON (same shape as the REST server), or
 from the private vault key store when VAULT_KEYS_TOKEN is set —
-identical semantics to app/server.py. Stage one: with neither
-variable set, or if the vault fetch fails, the bundled api_keys.json
-(DEMO keys) remains the fallback; stage two removes it and fails
-closed.
+identical semantics to app/server.py. Stage two (Nov 28, 2026):
+with neither variable set, or if the vault fetch fails, the server
+refuses to start — there is no fallback to the bundled
+api_keys.json demo keys.
 
 Data store: FILINGS_DB env var, else data/filings.db beside the repo
 root (build it with build_db.py), exactly like the REST server.
@@ -71,9 +71,10 @@ if not DB_PATH.exists():
                      f"Build it first: python3 build_db.py")
 STORE = API.Store(DB_PATH)
 # Key store resolution identical to app/server.py: API_KEYS_JSON,
-# then the private vault store via VAULT_KEYS_TOKEN, then the
-# stage one bundled demo fallback. Presence is logged (never a
-# value) so the resolution any boot performed is provable.
+# then the private vault store via VAULT_KEYS_TOKEN. There is no
+# fallback to the bundled demo file: a failed fetch, or no key
+# store configured at all, refuses to start. Presence is logged
+# (never a value) so the resolution any boot performed is provable.
 def _presence(name):
     raw = os.environ.get(name)
     if raw is None:
@@ -94,22 +95,21 @@ elif _vault_token:
         KEYS = API.KeyStore(cfg=API.fetch_vault_key_cfg_retry(
             _vault_token))
     except Exception as exc:
-        # Log the error class only, never content. Stage one: fall
-        # back to the bundled store, identical to app/server.py.
-        print("WARNING: vault key store fetch failed "
-              f"({API.fetch_error_label(exc)}) after retries. "
-              "Falling back to the bundled key store "
-              "(stage one fallback).")
-        KEYS = API.KeyStore(keys_path=str(ROOT / "api_keys.json"))
-        print("KEY STORE SOURCE: bundled demo file "
-              f"{ROOT / 'api_keys.json'} (stage one fallback).")
+        # Log the error class only, never content. Stage two: fail
+        # closed — refuse to start rather than serve demo keys.
+        print("ERROR: vault key store fetch failed "
+              f"({API.fetch_error_label(exc)}) after retries; "
+              "refusing to start without a key store.",
+              file=sys.stderr)
+        raise SystemExit(1)
     else:
         print("KEY STORE SOURCE: private vault key store "
               "(release keys-v1, fetched at startup, in memory only).")
 else:
-    KEYS = API.KeyStore(keys_path=str(ROOT / "api_keys.json"))
-    print("KEY STORE SOURCE: bundled demo file "
-          f"{ROOT / 'api_keys.json'} (stage one fallback).")
+    print("ERROR: no key store configured: set API_KEYS_JSON or "
+          "VAULT_KEYS_TOKEN; refusing to start without a key "
+          "store.", file=sys.stderr)
+    raise SystemExit(1)
 
 mcp = FastMCP(
     "New Business Filings API",
